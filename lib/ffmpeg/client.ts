@@ -1,9 +1,17 @@
-import { buildVideoConvertArgs } from "@/lib/ffmpeg/arguments";
+import { buildVideoConvertArgs, resolveCodecForFormat } from "@/lib/ffmpeg/arguments";
+import { NO_GAIN_WARNING, shouldKeepOriginal } from "@/lib/media/compression";
 import { createOutputFilename } from "@/lib/media/filenames";
 import { resolveResizeDimensions } from "@/lib/media/resize";
 import { getExtension } from "@/lib/validation/media-validation";
 import type { ProcessResult, VideoMetadata, VideoProcessOptions } from "@/types/media";
 
+
+/**
+ * 단일스레드 코어로 고정합니다.
+ * 멀티스레드 코어(@ffmpeg/core-mt)는 격리된 하니스에서 H.264 인코딩이 약 9배 빨랐지만,
+ * 이 앱의 번들 환경에서는 pthread 기동 시 "function signature mismatch"로 죽습니다
+ * (umd/esm 빌드 모두 재현). 원인 규명 전까지 안정적인 단일스레드를 유지합니다.
+ */
 const FFMPEG_CORE_VERSION = "0.12.10";
 
 const MIME_BY_FORMAT = {
@@ -29,7 +37,7 @@ export async function processVideoInBrowser(
   const dimensions = resolveResizeDimensions(metadata.width, metadata.height, options.resize);
   const resolvedOptions: VideoProcessOptions = {
     ...options,
-    videoCodec: options.outputFormat === "mp4" ? "h264" : options.videoCodec,
+    videoCodec: resolveCodecForFormat(options.outputFormat, options.videoCodec),
     resize:
       options.resize.mode === "original"
         ? options.resize
@@ -49,6 +57,7 @@ export async function processVideoInBrowser(
       ...resolvedOptions,
       inputName,
       outputName,
+      durationSeconds: metadata.duration,
     }),
   );
 
@@ -58,7 +67,16 @@ export async function processVideoInBrowser(
 
   const data = await ffmpeg.readFile(outputName);
   const bytes = data instanceof Uint8Array ? data : new TextEncoder().encode(data);
-  const blob = new Blob([bytes], { type: MIME_BY_FORMAT[options.outputFormat] });
+  const encoded = new Blob([bytes], { type: MIME_BY_FORMAT[options.outputFormat] });
+
+  const useOriginal = shouldKeepOriginal({
+    originalName: file.name,
+    originalSize: file.size,
+    encodedSize: encoded.size,
+    outputFormat: options.outputFormat,
+    resizeMode: options.resize.mode,
+  });
+  const blob = useOriginal ? file : encoded;
   const objectUrl = URL.createObjectURL(blob);
 
   await Promise.allSettled([ffmpeg.deleteFile(inputName), ffmpeg.deleteFile(outputName)]);
@@ -78,6 +96,8 @@ export async function processVideoInBrowser(
     width: dimensions.width,
     height: dimensions.height,
     duration: metadata.duration,
+    savedBytes: file.size - blob.size,
+    warnings: useOriginal ? [NO_GAIN_WARNING] : undefined,
   };
 }
 

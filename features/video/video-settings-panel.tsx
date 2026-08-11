@@ -1,7 +1,8 @@
 "use client";
 
 import { Link2, Unlink2 } from "lucide-react";
-import type { VideoProcessOptions } from "@/types/media";
+import { getCodecsForFormat, resolveCodecForFormat } from "@/lib/ffmpeg/arguments";
+import type { VideoCodec, VideoProcessOptions } from "@/types/media";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,18 @@ type VideoSettingsPanelProps = {
   onChange: (options: Partial<VideoProcessOptions>) => void;
 };
 
+const CODEC_LABELS: Record<VideoCodec, string> = {
+  h264: "H.264",
+};
+
+/** 브라우저 인코더로는 실용적인 시간 안에 끝나지 않아 선택만 막아둔 코덱입니다. */
+const UNAVAILABLE_CODEC_OPTIONS = [{ value: "h265", label: "H.265 - 브라우저 인코딩 과다 소요", disabled: true }];
+
 export function VideoSettingsPanel({ options, onChange }: VideoSettingsPanelProps) {
+  const availableCodecs = getCodecsForFormat(options.outputFormat);
+  const resolvedCodec = resolveCodecForFormat(options.outputFormat, options.videoCodec);
+  const isTargetSizeMode = options.targetSizeKb !== undefined;
+
   return (
     <div className="flex flex-col gap-4">
       <section className="flex flex-col gap-3 rounded-md border border-border bg-background p-3">
@@ -28,7 +40,7 @@ export function VideoSettingsPanel({ options, onChange }: VideoSettingsPanelProp
             value={options.outputFormat}
             options={[
               { value: "mp4", label: "MP4" },
-              { value: "webm", label: "WEBM" },
+              { value: "webm", label: "WEBM - 브라우저 인코더 미지원", disabled: true },
               { value: "mov", label: "MOV - server later", disabled: true },
               { value: "gif", label: "GIF - phase 4", disabled: true },
             ]}
@@ -36,43 +48,102 @@ export function VideoSettingsPanel({ options, onChange }: VideoSettingsPanelProp
               const outputFormat = event.currentTarget.value as VideoProcessOptions["outputFormat"];
               onChange({
                 outputFormat,
-                videoCodec: outputFormat === "mp4" ? "h264" : options.videoCodec,
+                videoCodec: resolveCodecForFormat(outputFormat, options.videoCodec),
               });
             }}
           />
         </Field>
         <Field label="Video codec">
           <Select
-            disabled={options.outputFormat === "mp4"}
-            value={options.outputFormat === "mp4" ? "h264" : options.videoCodec}
+            aria-label="Video codec"
+            value={resolvedCodec}
             options={[
-              { value: "h264", label: "H.264" },
-              { value: "vp9", label: "VP9" },
+              ...availableCodecs.map((codec) => ({ value: codec, label: CODEC_LABELS[codec] })),
+              ...UNAVAILABLE_CODEC_OPTIONS,
             ]}
             onChange={(event) => onChange({ videoCodec: event.currentTarget.value as VideoProcessOptions["videoCodec"] })}
           />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Bitrate kbps">
+        {isTargetSizeMode ? null : (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Bitrate kbps">
+              <Input
+                type="number"
+                min={256}
+                value={options.bitrateKbps ?? ""}
+                onChange={(event) =>
+                  onChange({ bitrateKbps: event.currentTarget.value ? Number(event.currentTarget.value) : undefined })
+                }
+              />
+            </Field>
+            <Field label="CRF">
+              <Input
+                type="number"
+                min={18}
+                max={40}
+                value={options.crf ?? ""}
+                onChange={(event) => onChange({ crf: event.currentTarget.value ? Number(event.currentTarget.value) : undefined })}
+              />
+            </Field>
+          </div>
+        )}
+        <Field label="Target size KB">
+          <Input
+            aria-label="Video target size KB"
+            inputMode="numeric"
+            min={1}
+            placeholder="비우면 CRF/Bitrate 설정을 사용합니다"
+            type="number"
+            value={options.targetSizeKb ?? ""}
+            onChange={(event) =>
+              onChange({ targetSizeKb: event.currentTarget.value ? Number(event.currentTarget.value) : undefined })
+            }
+          />
+        </Field>
+      </section>
+
+      <Separator />
+
+      <section className="flex flex-col gap-3 rounded-md border border-border bg-background p-3">
+        <h3 className="text-sm font-semibold">Audio</h3>
+        <Field label="Mode">
+          <Select
+            aria-label="Audio mode"
+            value={options.audio.mode}
+            options={[
+              { value: "keep", label: "Keep - 원본 유지" },
+              { value: "compress", label: "Compress - 비트레이트 지정" },
+              { value: "remove", label: "Remove - 오디오 제거" },
+            ]}
+            onChange={(event) =>
+              onChange({ audio: { ...options.audio, mode: event.currentTarget.value as VideoProcessOptions["audio"]["mode"] } })
+            }
+          />
+        </Field>
+        {options.audio.mode === "remove" ? null : (
+          <Field label="Audio bitrate kbps">
             <Input
+              aria-label="Audio bitrate kbps"
               type="number"
-              min={256}
-              value={options.bitrateKbps ?? ""}
+              min={32}
+              max={320}
+              value={options.audio.bitrateKbps ?? ""}
               onChange={(event) =>
-                onChange({ bitrateKbps: event.currentTarget.value ? Number(event.currentTarget.value) : undefined })
+                onChange({
+                  audio: {
+                    ...options.audio,
+                    bitrateKbps: event.currentTarget.value ? Number(event.currentTarget.value) : undefined,
+                  },
+                })
               }
             />
           </Field>
-          <Field label="CRF">
-            <Input
-              type="number"
-              min={18}
-              max={40}
-              value={options.crf ?? ""}
-              onChange={(event) => onChange({ crf: event.currentTarget.value ? Number(event.currentTarget.value) : undefined })}
-            />
-          </Field>
-        </div>
+        )}
+        {options.audio.mode === "keep" ? (
+          <p className="text-xs text-muted-foreground">
+            원본 오디오 스트림을 그대로 복사합니다. MP4가 담을 수 없는 코덱이면 변환이 실패하니, 그럴 땐 Compress를 사용하세요.
+          </p>
+        ) : null}
       </section>
 
       <Separator />

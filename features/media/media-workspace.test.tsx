@@ -357,3 +357,45 @@ function createItem({
     warnings: [],
   } as UploadedMedia;
 }
+
+describe("MediaWorkspace - 미지원 파일 집계", () => {
+  it("지원하지 않는 파일은 Images 집계에서 제외해야 한다", () => {
+    // 미지원 파일은 확장자를 못 읽어 type이 image로 채워집니다(getFallbackMediaType).
+    useMediaStore.setState({
+      items: [
+        {
+          id: "ok",
+          file: new File(["x"], "photo.png", { type: "image/png" }),
+          type: "image",
+          name: "photo.png",
+          size: 10,
+          mimeType: "image/png",
+          objectUrl: "blob:ok",
+          metadata: { width: 10, height: 10, format: "PNG" },
+          status: "idle",
+          progress: 0,
+          warnings: [],
+        },
+        {
+          id: "bad",
+          file: new File(["x"], "notes.txt", { type: "text/plain" }),
+          type: "image",
+          name: "notes.txt",
+          size: 5,
+          mimeType: "text/plain",
+          objectUrl: "",
+          status: "failed",
+          progress: 0,
+          warnings: [],
+          error: { code: "unsupported_file_type", message: "지원하지 않는 파일 형식입니다." },
+        },
+      ] as UploadedMedia[],
+      selectedId: "ok",
+    });
+
+    render(<MediaWorkspace />);
+
+    expect(screen.getByText("Images").closest("div")).toHaveTextContent("1");
+    expect(screen.getByText("Total").closest("div")).toHaveTextContent("2");
+  });
+});

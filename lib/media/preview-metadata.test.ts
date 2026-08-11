@@ -116,6 +116,7 @@ function createVideoItem() {
       width: 1280,
       height: 720,
       duration: 12,
+      savedBytes: 0,
     },
     warnings: [],
   } as UploadedMedia;

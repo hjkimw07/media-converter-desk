@@ -1,6 +1,7 @@
 "use client";
 
 import { Link2, Unlink2 } from "lucide-react";
+import { isLossyFormat } from "@/lib/image/encoders";
 import type { ImageProcessOptions } from "@/types/media";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,12 @@ type ImageSettingsPanelProps = {
 };
 
 export function ImageSettingsPanel({ options, onChange }: ImageSettingsPanelProps) {
+  const supportsQuality = isLossyFormat(options.outputFormat);
+  const isTargetSizeMode = options.compression.mode === "targetSize";
+
+  const updateCompression = (patch: Partial<ImageProcessOptions["compression"]>) =>
+    onChange({ compression: { ...options.compression, ...patch } });
+
   return (
     <div className="flex flex-col gap-4">
       <section className="flex flex-col gap-3 rounded-md border border-border bg-background p-3">
@@ -25,26 +32,36 @@ export function ImageSettingsPanel({ options, onChange }: ImageSettingsPanelProp
         </div>
         <Field label="Format">
           <Select
+            aria-label="Image output format"
             value={options.outputFormat}
             options={[
-              { value: "jpg", label: "JPG" },
-              { value: "png", label: "PNG" },
-              { value: "webp", label: "WEBP" },
-              { value: "avif", label: "AVIF - server later", disabled: true },
+              { value: "jpg", label: "JPG - 호환성" },
+              { value: "png", label: "PNG - 무손실" },
+              { value: "webp", label: "WEBP - 범용 권장" },
+              { value: "avif", label: "AVIF - 사진에 최적" },
             ]}
             onChange={(event) => onChange({ outputFormat: event.currentTarget.value as ImageProcessOptions["outputFormat"] })}
           />
         </Field>
-        <Field label={`Quality ${options.quality}`}>
-          <input
-            className="w-full accent-primary"
-            type="range"
-            min={1}
-            max={100}
-            value={options.quality}
-            onChange={(event) => onChange({ quality: Number(event.currentTarget.value) })}
-          />
-        </Field>
+        {options.outputFormat === "avif" ? (
+          <p className="text-xs text-muted-foreground">
+            사진은 WEBP보다 20~30% 작아지지만, UI 스크린샷처럼 평면적인 이미지는 오히려 커질 수 있습니다. 인코딩도 WEBP보다 3~5배
+            느립니다.
+          </p>
+        ) : null}
+        {isTargetSizeMode ? null : (
+          <Field label={`Quality ${options.quality}`}>
+            <input
+              className="w-full accent-primary"
+              disabled={!supportsQuality}
+              type="range"
+              min={1}
+              max={100}
+              value={options.quality}
+              onChange={(event) => onChange({ quality: Number(event.currentTarget.value) })}
+            />
+          </Field>
+        )}
         {options.outputFormat === "jpg" ? (
           <Field label="JPG background">
             <Input
@@ -53,6 +70,61 @@ export function ImageSettingsPanel({ options, onChange }: ImageSettingsPanelProp
               onChange={(event) => onChange({ backgroundColor: event.currentTarget.value })}
             />
           </Field>
+        ) : null}
+      </section>
+
+      <Separator />
+
+      <section className="flex flex-col gap-3 rounded-md border border-border bg-background p-3">
+        <h3 className="text-sm font-semibold">Compression</h3>
+        <Field label="Mode">
+          <Select
+            aria-label="Compression mode"
+            value={options.compression.mode}
+            options={[
+              { value: "quality", label: "Quality - 품질 직접 지정" },
+              { value: "targetSize", label: "Target size - 목표 용량 자동 맞춤" },
+            ]}
+            onChange={(event) =>
+              updateCompression({ mode: event.currentTarget.value as ImageProcessOptions["compression"]["mode"] })
+            }
+          />
+        </Field>
+        {isTargetSizeMode ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Target size KB">
+                <Input
+                  aria-label="Target size KB"
+                  inputMode="numeric"
+                  min={1}
+                  type="number"
+                  value={options.compression.targetSizeKb ?? ""}
+                  onChange={(event) =>
+                    updateCompression({
+                      targetSizeKb: event.currentTarget.value ? Number(event.currentTarget.value) : undefined,
+                    })
+                  }
+                />
+              </Field>
+              <Field label="Min quality">
+                <Input
+                  aria-label="Min quality"
+                  inputMode="numeric"
+                  min={1}
+                  max={100}
+                  type="number"
+                  value={options.compression.minQuality}
+                  onChange={(event) => updateCompression({ minQuality: Number(event.currentTarget.value) })}
+                />
+              </Field>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {supportsQuality
+                ? `해상도는 유지한 채 품질을 ${options.compression.minQuality}까지 낮춰가며 목표 용량을 맞춥니다.`
+                : "PNG는 무손실이라 목표 용량을 보장할 수 없습니다. WEBP 또는 AVIF를 사용해 주세요."}
+            </p>
+          </>
         ) : null}
       </section>
 
