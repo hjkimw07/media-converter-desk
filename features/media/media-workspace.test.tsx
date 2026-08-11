@@ -104,7 +104,7 @@ describe("MediaWorkspace", () => {
 
     expect(drawer).toHaveAttribute("data-state", "closed");
     expect(settingsButton).toHaveAttribute("aria-pressed", "false");
-    expect(settingsButton).toHaveClass("size-9", "border-white", "bg-white", "text-black");
+    expect(settingsButton).toHaveClass("size-9", "border-primary", "bg-primary", "text-primary-foreground");
     expect(settingsButton).not.toHaveTextContent("Settings");
 
     fireEvent.click(settingsButton);
@@ -212,7 +212,9 @@ describe("MediaWorkspace", () => {
 
     expect(useMediaStore.getState().items.map((item) => item.id)).toEqual(["loose"]);
 
+    // 전체 삭제는 확인 다이얼로그를 거칩니다.
     fireEvent.click(screen.getByRole("button", { name: "Clear all source media" }));
+    fireEvent.click(screen.getByRole("button", { name: "전체 삭제" }));
     expect(useMediaStore.getState().items).toHaveLength(0);
   });
 
@@ -397,5 +399,60 @@ describe("MediaWorkspace - 미지원 파일 집계", () => {
 
     expect(screen.getByText("Images").closest("div")).toHaveTextContent("1");
     expect(screen.getByText("Total").closest("div")).toHaveTextContent("2");
+  });
+});
+
+describe("MediaWorkspace - 전체 삭제 확인", () => {
+  function seedItem() {
+    useMediaStore.setState({
+      items: [
+        {
+          id: "a",
+          file: new File(["x"], "photo.png", { type: "image/png" }),
+          type: "image",
+          name: "photo.png",
+          size: 10,
+          mimeType: "image/png",
+          objectUrl: "blob:a",
+          metadata: { width: 10, height: 10, format: "PNG" },
+          status: "idle",
+          progress: 0,
+          warnings: [],
+        },
+      ] as UploadedMedia[],
+      selectedId: "a",
+    });
+  }
+
+  it("전체 삭제를 누르면 바로 지우지 않고 확인을 물어야 한다", () => {
+    seedItem();
+    render(<MediaWorkspace />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear all source media" }));
+
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(useMediaStore.getState().items).toHaveLength(1);
+  });
+
+  it("확인을 누르면 큐를 비워야 한다", () => {
+    seedItem();
+    render(<MediaWorkspace />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear all source media" }));
+    fireEvent.click(screen.getByRole("button", { name: "전체 삭제" }));
+
+    expect(useMediaStore.getState().items).toHaveLength(0);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("취소하면 큐를 유지해야 한다", () => {
+    seedItem();
+    render(<MediaWorkspace />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear all source media" }));
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+
+    expect(useMediaStore.getState().items).toHaveLength(1);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 });

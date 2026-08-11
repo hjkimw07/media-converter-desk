@@ -1,21 +1,26 @@
 "use client";
 
 import { useCallback, useRef, useState, type PointerEvent } from "react";
-import { ArrowRight, ImageIcon, Maximize2, Minus, Plus, VideoIcon } from "lucide-react";
+import { ArrowRight, ChevronsLeft, ChevronsRight, ImageIcon, Layers, Maximize2, Minus, Plus, VideoIcon } from "lucide-react";
 import type { ApiError, MediaWarning, UploadedMedia } from "@/types/media";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatBytes, formatPercentChange } from "@/lib/media/format";
 import { buildPreviewMetadata, type PreviewMetadataRow } from "@/lib/media/preview-metadata";
+import {
+  MAX_PREVIEW_ZOOM,
+  MIN_PREVIEW_ZOOM,
+  parseZoomInput,
+  largeStepZoom,
+  stepZoom,
+} from "@/lib/media/preview-zoom";
+import { Input } from "@/components/ui/input";
 
 type PreviewPanelProps = {
   item?: UploadedMedia;
   action?: React.ReactNode;
 };
 
-const MIN_PREVIEW_ZOOM = 50;
-const MAX_PREVIEW_ZOOM = 1000;
-const PREVIEW_ZOOM_STEP = 10;
 type PreviewPaneKey = "original" | "result";
 
 export function PreviewPanel({ item, action }: PreviewPanelProps) {
@@ -71,8 +76,10 @@ export function PreviewPanel({ item, action }: PreviewPanelProps) {
   }
 
   const metadata = buildPreviewMetadata(item);
-  const zoomOut = () => setZoom((current) => Math.max(MIN_PREVIEW_ZOOM, current - PREVIEW_ZOOM_STEP));
-  const zoomIn = () => setZoom((current) => Math.min(MAX_PREVIEW_ZOOM, current + PREVIEW_ZOOM_STEP));
+  const zoomOut = () => setZoom((current) => stepZoom(current, -1));
+  const zoomIn = () => setZoom((current) => stepZoom(current, 1));
+  const zoomOutFast = () => setZoom((current) => largeStepZoom(current, -1));
+  const zoomInFast = () => setZoom((current) => largeStepZoom(current, 1));
   const fitPreview = () => setZoom(100);
 
   return (
@@ -82,7 +89,10 @@ export function PreviewPanel({ item, action }: PreviewPanelProps) {
     >
       <div className="flex shrink-0 flex-col gap-2 border-b border-border p-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold leading-6">Preview canvas</h2>
+          <h2 className="flex items-center gap-2 text-base font-semibold leading-6 text-ink">
+            <Layers aria-hidden="true" className="size-4 shrink-0 text-link" />
+            Preview canvas
+          </h2>
           <p className="truncate text-sm leading-5 text-muted-foreground">{item.name}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -90,7 +100,15 @@ export function PreviewPanel({ item, action }: PreviewPanelProps) {
           <Badge variant="muted">{item.status}</Badge>
           <Badge variant="muted">{formatBytes(item.size)}</Badge>
           {item.result ? <Badge variant="secondary">{formatPercentChange(item.size, item.result.size)}</Badge> : null}
-          <PreviewZoomControls zoom={zoom} onFit={fitPreview} onZoomIn={zoomIn} onZoomOut={zoomOut} />
+          <PreviewZoomControls
+            zoom={zoom}
+            onFit={fitPreview}
+            onZoomChange={setZoom}
+            onZoomIn={zoomIn}
+            onZoomInFast={zoomInFast}
+            onZoomOut={zoomOut}
+            onZoomOutFast={zoomOutFast}
+          />
           {action}
         </div>
       </div>
@@ -112,7 +130,7 @@ export function PreviewPanel({ item, action }: PreviewPanelProps) {
           description={item.result ? "Converted output" : "Run conversion to preview output"}
         >
           {item.result ? (
-            <>
+            <div key={item.result.objectUrl} className="animate-rise flex min-h-0 flex-1 flex-col gap-3">
               <MediaPreview
                 item={item}
                 src={item.result.objectUrl}
@@ -123,7 +141,7 @@ export function PreviewPanel({ item, action }: PreviewPanelProps) {
               />
               <PreviewMetadata title="After metadata" rows={metadata.after} />
               <ConversionWarnings warnings={item.result.warnings} />
-            </>
+            </div>
           ) : (
             <>
               <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-dashed hairline-dashed bg-secondary/40 p-4 text-center text-sm text-muted-foreground">
@@ -146,7 +164,7 @@ function ConversionError({ error }: { error?: ApiError }) {
   }
 
   return (
-    <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive-foreground">
+    <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive-deep">
       <p className="font-medium">{error.message}</p>
       {error.detail ? (
         <details className="mt-2">
@@ -169,7 +187,7 @@ function ConversionWarnings({ warnings }: { warnings?: MediaWarning[] }) {
       {warnings.map((warning) => (
         <li
           key={warning.code}
-          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+          className="rounded-sm border border-border bg-warning-soft px-3 py-2 text-xs text-warning-deep"
         >
           {warning.message}
         </li>
@@ -181,14 +199,35 @@ function ConversionWarnings({ warnings }: { warnings?: MediaWarning[] }) {
 function PreviewZoomControls({
   zoom,
   onFit,
+  onZoomChange,
   onZoomIn,
+  onZoomInFast,
   onZoomOut,
+  onZoomOutFast,
 }: {
   zoom: number;
   onFit: () => void;
+  onZoomChange: (zoom: number) => void;
   onZoomIn: () => void;
+  onZoomInFast: () => void;
   onZoomOut: () => void;
+  onZoomOutFast: () => void;
 }) {
+  // 입력 중에는 문자열을 그대로 두어 지웠다 다시 치는 흐름을 막지 않습니다.
+  const [draft, setDraft] = useState<string | undefined>();
+
+  const commitDraft = () => {
+    if (draft !== undefined) {
+      const parsed = parseZoomInput(draft);
+
+      if (parsed !== undefined) {
+        onZoomChange(parsed);
+      }
+    }
+
+    setDraft(undefined);
+  };
+
   return (
     <div className="flex h-8 items-center rounded-sm border border-border bg-secondary">
       <Button aria-label="Fit preview" className="h-7 px-2" size="sm" variant="ghost" onClick={onFit}>
@@ -196,12 +235,73 @@ function PreviewZoomControls({
         Fit
       </Button>
       <div className="h-5 w-px bg-border" />
-      <Button aria-label="Zoom out" className="size-7 px-0" disabled={zoom <= MIN_PREVIEW_ZOOM} size="icon" variant="ghost" onClick={onZoomOut}>
+      <Button
+        aria-label="Zoom out by 100 percent"
+        className="size-7 px-0"
+        disabled={zoom <= MIN_PREVIEW_ZOOM}
+        size="icon"
+        title="100% 축소"
+        variant="ghost"
+        onClick={onZoomOutFast}
+      >
+        <ChevronsLeft data-icon="inline-start" />
+      </Button>
+      <Button
+        aria-label="Zoom out"
+        className="size-7 px-0"
+        disabled={zoom <= MIN_PREVIEW_ZOOM}
+        size="icon"
+        title="한 단계 축소"
+        variant="ghost"
+        onClick={onZoomOut}
+      >
         <Minus data-icon="inline-start" />
       </Button>
-      <span className="font-brand-mono w-14 text-center text-xs leading-5 text-muted-foreground">{zoom}%</span>
-      <Button aria-label="Zoom in" className="size-7 px-0" disabled={zoom >= MAX_PREVIEW_ZOOM} size="icon" variant="ghost" onClick={onZoomIn}>
+      <div className="flex items-center">
+        <Input
+          aria-label="Zoom percent"
+          className="font-brand-mono h-7 w-14 rounded-sm border-transparent bg-transparent px-1 text-center text-xs leading-5"
+          inputMode="numeric"
+          value={draft ?? String(zoom)}
+          onBlur={commitDraft}
+          onChange={(event) => setDraft(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.currentTarget.blur();
+              return;
+            }
+
+            if (event.key === "Escape") {
+              setDraft(undefined);
+              event.currentTarget.blur();
+            }
+          }}
+        />
+        <span aria-hidden="true" className="font-brand-mono -ml-1 text-xs leading-5 text-muted-foreground">
+          %
+        </span>
+      </div>
+      <Button
+        aria-label="Zoom in"
+        className="size-7 px-0"
+        disabled={zoom >= MAX_PREVIEW_ZOOM}
+        size="icon"
+        title="한 단계 확대"
+        variant="ghost"
+        onClick={onZoomIn}
+      >
         <Plus data-icon="inline-start" />
+      </Button>
+      <Button
+        aria-label="Zoom in by 100 percent"
+        className="size-7 px-0"
+        disabled={zoom >= MAX_PREVIEW_ZOOM}
+        size="icon"
+        title="100% 확대"
+        variant="ghost"
+        onClick={onZoomInFast}
+      >
+        <ChevronsRight data-icon="inline-start" />
       </Button>
     </div>
   );
@@ -222,7 +322,7 @@ function PreviewPane({
       className="flex h-[360px] shrink-0 flex-col gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3 xl:h-auto xl:min-h-0 xl:shrink xl:flex-1"
     >
       <div className="min-w-0 shrink-0">
-        <h3 className="text-sm font-semibold leading-5">{title}</h3>
+        <h3 className="text-sm font-semibold leading-5 text-ink">{title}</h3>
         <p className="truncate text-xs leading-5 text-muted-foreground">{description}</p>
       </div>
       <div
@@ -354,7 +454,8 @@ function PreviewMetadata({ title, rows }: { title: string; rows: PreviewMetadata
         {rows.map((row) => (
           <div key={`${title}-${row.label}`} className="min-w-0 rounded-sm bg-secondary px-2 py-1.5">
             <dt className="text-[11px] leading-4 text-muted-foreground">{row.label}</dt>
-            <dd className="font-brand-mono truncate text-xs leading-4 text-foreground">{row.value}</dd>
+            {/* 라벨과 값의 위계를 가중치로만 벌립니다. 색을 더 올리면 잉크 계단이 무너집니다. */}
+            <dd className="font-brand-mono truncate text-xs font-medium leading-4 text-ink">{row.value}</dd>
           </div>
         ))}
       </dl>

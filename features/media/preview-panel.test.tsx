@@ -26,17 +26,76 @@ describe("PreviewPanel", () => {
   it("supports zooming the preview media and returning to fit", () => {
     render(<PreviewPanel item={createConvertedImage()} />);
 
-    expect(screen.getByText("100%")).toBeInTheDocument();
+    const zoomInput = screen.getByLabelText("Zoom percent");
+
+    expect(zoomInput).toHaveValue("100");
 
     fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
-    expect(screen.getByText("110%")).toBeInTheDocument();
+    expect(zoomInput).toHaveValue("110");
     expect(screen.getAllByAltText("sample.png")[0]).toHaveStyle({ width: "110%", height: "110%" });
 
     fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
-    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(zoomInput).toHaveValue("100");
 
     fireEvent.click(screen.getByRole("button", { name: "Fit preview" }));
-    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(zoomInput).toHaveValue("100");
+  });
+
+  it("큰 조정 버튼은 100%p씩 움직여야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    const zoomInput = screen.getByLabelText("Zoom percent");
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in by 100 percent" }));
+    expect(zoomInput).toHaveValue("200");
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in by 100 percent" }));
+    expect(zoomInput).toHaveValue("300");
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom out by 100 percent" }));
+    expect(zoomInput).toHaveValue("200");
+
+    // 미세 조정(10%p)보다 크게 움직여야 한다.
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(zoomInput).toHaveValue("210");
+  });
+
+  it("확대율을 직접 입력하면 미리보기에 반영해야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    const zoomInput = screen.getByLabelText("Zoom percent");
+
+    fireEvent.change(zoomInput, { target: { value: "325" } });
+    fireEvent.blur(zoomInput);
+
+    expect(zoomInput).toHaveValue("325");
+    expect(screen.getAllByAltText("sample.png")[0]).toHaveStyle({ width: "325%", height: "325%" });
+  });
+
+  it("허용 범위를 벗어난 입력은 잘라내야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    const zoomInput = screen.getByLabelText("Zoom percent");
+
+    fireEvent.change(zoomInput, { target: { value: "9999" } });
+    fireEvent.blur(zoomInput);
+    expect(zoomInput).toHaveValue("1000");
+
+    fireEvent.change(zoomInput, { target: { value: "1" } });
+    fireEvent.blur(zoomInput);
+    expect(zoomInput).toHaveValue("50");
+  });
+
+  it("입력을 비우고 포커스를 잃으면 직전 배율을 유지해야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    const zoomInput = screen.getByLabelText("Zoom percent");
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    fireEvent.change(zoomInput, { target: { value: "" } });
+    fireEvent.blur(zoomInput);
+
+    expect(zoomInput).toHaveValue("110");
   });
 
   it("allows preview zooming up to 1000 percent", () => {
@@ -48,7 +107,7 @@ describe("PreviewPanel", () => {
       fireEvent.click(zoomIn);
     }
 
-    expect(screen.getByText("1000%")).toBeInTheDocument();
+    expect(screen.getByLabelText("Zoom percent")).toHaveValue("1000");
     expect(zoomIn).toBeDisabled();
     expect(screen.getAllByAltText("sample.png")[0]).toHaveStyle({ width: "1000%", height: "1000%" });
   });

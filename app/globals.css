@@ -3,45 +3,93 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * Geist 디자인 시스템 토큰 (DESIGN-vercel.md).
+   * 잉크 하나로 제목·CTA·테두리를 모두 처리하고, 색은 헤더 mesh gradient와
+   * 링크/시맨틱에만 허용합니다.
+   *
+   * 다크가 기본값이라 :root에 두고, 라이트는 .light 클래스로 덮습니다.
+   * 이 순서 덕분에 JS가 늦게 붙어도 기본 테마가 깜빡이지 않습니다.
+   */
   :root {
-    --background: 0 0% 6%;
-    --foreground: 0 0% 95%;
-    --card: 0 0% 6%;
-    --card-foreground: 0 0% 95%;
-    --primary: 160 100% 43%;
-    --primary-foreground: 0 0% 6%;
-    --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 95%;
+    --background: 0 0% 0%; /* #000000 */
+    --foreground: 0 0% 93%; /* #ededed */
+    --card: 0 0% 4%; /* #0a0a0a */
+    --card-foreground: 0 0% 93%;
+    --primary: 0 0% 93%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 10%; /* #1a1a1a */
+    --secondary-foreground: 0 0% 93%;
     --muted: 0 0% 10%;
-    --muted-foreground: 214 9% 58%;
+    --muted-foreground: 0 0% 56%; /* #8f8f8f */
     --accent: 0 0% 10%;
-    --accent-foreground: 162 67% 51%;
-    --destructive: 0 70% 52%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 15 3% 23%;
-    --input: 15 3% 23%;
-    --ring: 162 67% 51%;
-    --radius: 0.375rem;
+    --accent-foreground: 212 100% 60%;
+    --destructive: 0 100% 65%; /* #ff4d4d */
+    --destructive-foreground: 0 0% 4%;
+    --border: 0 0% 18%; /* #2e2e2e */
+    --input: 0 0% 18%;
+    --ring: 212 100% 60%;
+    --radius: 0.75rem;
+
+    /* 잉크 계단: ink → body → muted-foreground → faint */
+    --ink: 0 0% 93%;
+    --body: 0 0% 63%; /* #a1a1a1 */
+    --faint: 0 0% 49%; /* #7d7d7d */
+
+    --link: 212 100% 60%; /* #3291ff */
+    --link-deep: 212 100% 75%;
+    --link-soft: 212 100% 12%;
+    --warning: 36 91% 55%; /* #f5a623 */
+    --warning-soft: 36 60% 11%;
+    --warning-deep: 36 91% 68%;
+    --error-deep: 0 100% 78%;
+
+    /* 아이콘·강조 요소용 accent. 넓은 면을 칠하지 않고 작은 요소에만 씁니다. */
+    --accent-cyan: 166 71% 60%; /* #50e3c2 */
+    --accent-violet: 273 80% 70%;
+    --accent-pink: 330 100% 68%;
+
+    --mesh-alpha: 0.24;
+    color-scheme: dark;
   }
 
-  .dark {
-    --background: 0 0% 6%;
-    --foreground: 0 0% 95%;
-    --card: 0 0% 6%;
-    --card-foreground: 0 0% 95%;
-    --primary: 160 100% 43%;
-    --primary-foreground: 0 0% 6%;
-    --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 95%;
-    --muted: 0 0% 10%;
-    --muted-foreground: 214 9% 58%;
-    --accent: 0 0% 10%;
-    --accent-foreground: 162 67% 51%;
-    --destructive: 0 70% 52%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 15 3% 23%;
-    --input: 15 3% 23%;
-    --ring: 162 67% 51%;
+  :root.light {
+    --background: 0 0% 98%; /* canvas #fafafa */
+    --foreground: 0 0% 9%; /* ink #171717 */
+    --card: 0 0% 100%; /* canvas-elevated #ffffff */
+    --card-foreground: 0 0% 9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 95%; /* hairline-soft #f2f2f2 */
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 95%;
+    --muted-foreground: 0 0% 56%;
+    --accent: 0 0% 95%;
+    --accent-foreground: 212 100% 48%;
+    --destructive: 0 100% 47%; /* #ee0000 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 92%; /* hairline #ebebeb */
+    --input: 0 0% 92%;
+    --ring: 212 100% 48%;
+
+    --ink: 0 0% 9%;
+    --body: 0 0% 30%; /* #4d4d4d */
+    --faint: 0 0% 63%; /* #a1a1a1 */
+
+    --link: 212 100% 48%; /* #0070f3 */
+    --link-deep: 212 93% 42%;
+    --link-soft: 215 100% 92%;
+    --warning: 36 91% 55%;
+    --warning-soft: 40 100% 91%;
+    --warning-deep: 29 89% 36%;
+    --error-deep: 0 100% 39%;
+
+    --accent-cyan: 166 71% 38%;
+    --accent-violet: 273 67% 48%; /* #7928ca */
+    --accent-pink: 330 100% 45%;
+
+    --mesh-alpha: 0.16;
+    color-scheme: light;
   }
 
   * {
@@ -52,12 +100,38 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    color-scheme: dark;
-    font-family:
-      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: var(--font-geist-sans), Arial, ui-sans-serif, system-ui, sans-serif;
     font-feature-settings:
       "calt" 1,
       "rlig" 1;
+  }
+
+  /*
+   * 접근성: 모션 최소화를 켠 사용자에게는 전환을 사실상 끕니다.
+   * 개별 컴포넌트에서 duration을 지정해도 여기서 덮어씁니다.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* 디스플레이 타입은 클수록 자간을 더 조입니다 (Geist 규칙). */
+  h1 {
+    letter-spacing: -0.05em;
+  }
+
+  h2 {
+    letter-spacing: -0.04em;
+  }
+
+  h3 {
+    letter-spacing: -0.02em;
   }
 }
 
@@ -79,14 +153,52 @@
 
 @layer utilities {
   .font-brand-mono {
-    font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  /* 섹션을 여는 대문자 모노 eyebrow 라벨. */
+  .eyebrow {
+    font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    text-transform: uppercase;
   }
 
   .hairline-dashed {
-    border-color: rgba(79, 93, 117, 0.4);
+    border-color: hsl(var(--border));
   }
 
   .text-balance {
     text-wrap: balance;
+  }
+
+  /*
+   * 이 시스템에서 유일하게 허용되는 장식. 헤더 밴드 뒤에만 깔립니다.
+   * cyan → blue → violet → magenta → amber 다중 스톱 mesh.
+   */
+  /* 결과가 처음 나타날 때만 쓰는 짧은 진입 모션. */
+  .animate-rise {
+    animation: rise 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .mesh-gradient {
+    background-image:
+      radial-gradient(60% 120% at 12% 0%, rgb(0 223 216 / var(--mesh-alpha)) 0%, transparent 60%),
+      radial-gradient(50% 120% at 38% 0%, rgb(0 124 240 / var(--mesh-alpha)) 0%, transparent 60%),
+      radial-gradient(50% 120% at 62% 0%, rgb(121 40 202 / var(--mesh-alpha)) 0%, transparent 60%),
+      radial-gradient(45% 120% at 82% 0%, rgb(255 0 128 / var(--mesh-alpha)) 0%, transparent 60%),
+      radial-gradient(45% 120% at 98% 0%, rgb(249 203 40 / var(--mesh-alpha)) 0%, transparent 60%);
   }
 }

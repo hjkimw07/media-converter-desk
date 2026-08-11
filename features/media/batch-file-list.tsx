@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type PointerEvent } from "react";
-import { Check, ChevronDown, ChevronRight, Download, Folder, GripVertical, Minus, Trash2 } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronRight, Download, Folder, GripVertical, Minus, SquareMinus, Trash2 } from "lucide-react";
 import type { UploadedMedia } from "@/types/media";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ type BatchFileListProps = {
   onSelect: (id: string) => void;
   onToggleChecked: (id: string) => void;
   onToggleAll: (checked: boolean) => void;
+  /** 소스 큐 전체 비우기. 선택 액션 옆에 함께 놓습니다. */
+  onClearAll?: () => void;
   onReorder: (sourceId: string, targetId: string, placement?: ReorderPlacement) => void;
   onReorderGroup?: (sourceGroupKey: string, targetGroupKey: string, placement?: ReorderPlacement) => void;
   onRename?: (id: string, name: string) => void;
@@ -35,6 +37,7 @@ export function BatchFileList({
   onSelect,
   onToggleChecked,
   onToggleAll,
+  onClearAll,
   onReorder,
   onReorderGroup,
   onRename,
@@ -118,9 +121,28 @@ export function BatchFileList({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
         <p className="truncate text-xs text-muted-foreground">{selectedVisibleCount}개 선택</p>
-        <Button size="sm" variant="ghost" onClick={() => onToggleAll(!allChecked)}>
-          {allChecked ? "선택 해제" : "전체 선택"}
-        </Button>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button className="h-8 px-2 text-xs" size="sm" variant="ghost" onClick={() => onToggleAll(!allChecked)}>
+            {allChecked ? (
+              <SquareMinus aria-hidden="true" data-icon="inline-start" />
+            ) : (
+              <CheckCheck aria-hidden="true" data-icon="inline-start" className="text-link" />
+            )}
+            {allChecked ? "전체 해제" : "전체 선택"}
+          </Button>
+          {onClearAll ? (
+            <Button
+              aria-label="Clear all source media"
+              className="h-8 px-2 text-xs hover:text-destructive"
+              size="sm"
+              variant="ghost"
+              onClick={onClearAll}
+            >
+              <Trash2 aria-hidden="true" data-icon="inline-start" />
+              전체 삭제
+            </Button>
+          ) : null}
+        </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
         {groups.map((group) => (
@@ -328,7 +350,7 @@ export function BatchFileList({
                       }}
                       onPointerCancel={() => setDraggingId(undefined)}
                       className={cn(
-                        "group relative grid w-full cursor-pointer grid-cols-[28px_24px_minmax(0,1fr)_auto] items-start gap-2 rounded-md border border-border bg-background p-2 transition-colors hover:border-primary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        "group relative grid w-full cursor-pointer grid-cols-[28px_24px_minmax(0,1fr)_auto] items-start gap-2 rounded-md border border-border bg-background p-2 transition-[border-color,background-color,transform] duration-150 ease-out hover:border-foreground/30 hover:bg-secondary/60 active:scale-[0.995] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                         selectedId === item.id && "border-primary bg-secondary",
                         draggingId === item.id && "border-primary bg-primary/10",
                         item.error?.code === "unsupported_file_type" && "border-destructive bg-destructive/5",
@@ -589,8 +611,8 @@ function MimePill({ item }: { item: UploadedMedia }) {
       data-testid={`mime-pill-${item.id}`}
       className={cn(
         "font-brand-mono min-w-0 truncate rounded-sm border px-1.5 py-0.5 text-[11px] leading-4",
-        item.type === "image" && "border-cyan-400/30 bg-cyan-400/10 text-cyan-200",
-        item.type === "video" && "border-amber-400/30 bg-amber-400/10 text-amber-200",
+        // 타입 구분은 색이 아니라 라벨로 합니다. accent는 chrome에 쓰지 않습니다.
+        "border-border bg-secondary text-body",
       )}
     >
       {item.mimeType || "unknown MIME"}

@@ -174,7 +174,7 @@ describe("BatchFileList", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "선택 해제" }));
+    fireEvent.click(screen.getByRole("button", { name: "전체 해제" }));
     expect(onToggleAll).toHaveBeenCalledWith(false);
 
     expect(screen.getByLabelText("Download sample.png")).toBeDisabled();
@@ -827,3 +827,54 @@ function createItem(
     warnings: [],
   } as UploadedMedia;
 }
+
+describe("BatchFileList - 선택·삭제 액션 배치", () => {
+  it("전체 선택 버튼에 아이콘이 있고 전체 삭제가 그 오른쪽에 와야 한다", () => {
+    const onClearAll = vi.fn();
+
+    render(
+      <BatchFileList
+        items={[createItem("a", "a.png")]}
+        checkedIds={new Set()}
+        onSelect={vi.fn()}
+        onToggleChecked={vi.fn()}
+        onToggleAll={vi.fn()}
+        onClearAll={onClearAll}
+        onReorder={vi.fn()}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+      />,
+    );
+
+    const selectAll = screen.getByRole("button", { name: "전체 선택" });
+    const clearAll = screen.getByRole("button", { name: "Clear all source media" });
+
+    expect(selectAll.querySelector("svg")).toBeInTheDocument();
+    // 문서 순서상 전체 삭제가 전체 선택 뒤에 와야 합니다.
+    expect(selectAll.compareDocumentPosition(clearAll) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(clearAll);
+    expect(onClearAll).toHaveBeenCalledOnce();
+  });
+
+  it("항목이 없으면 선택·삭제 툴바를 그리지 않아야 한다", () => {
+    render(
+      <BatchFileList
+        items={[]}
+        checkedIds={new Set()}
+        onSelect={vi.fn()}
+        onToggleChecked={vi.fn()}
+        onToggleAll={vi.fn()}
+        onClearAll={vi.fn()}
+        onReorder={vi.fn()}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Clear all source media" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "전체 선택" })).not.toBeInTheDocument();
+  });
+});
