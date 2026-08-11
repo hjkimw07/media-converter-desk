@@ -39,12 +39,29 @@ npm run dev
 
 ![Media Convert Desk dashboard](public/readme/dashboard-overview.png)
 
-- **상단** — Total / Images / Videos / Selected / Converted / Input·Output Total Size
+- **상단** — Total / Images / Videos / Selected / Converted / Input·Output Total Size, 우측 끝에 테마 토글
 - **좌측** — 업로드, Source queue (그룹·정렬·이름 변경·선택)
 - **중앙** — Original / Result 비교 캔버스, 하단 변환·다운로드 액션바
 - **우측** — Settings drawer
 
 ![Settings drawer](public/readme/settings-drawer.png)
+
+### 확대·축소
+
+Preview canvas 우측 줌 컨트롤로 원본/결과를 같은 배율로 비교합니다.
+
+| 컨트롤 | 동작 |
+| --- | --- |
+| `−` / `+` | 10%씩 미세 조정 |
+| `«` / `»` | **100%p씩 크게** 축소·확대 — 100% → 200% → 300% |
+| 숫자 입력 | 원하는 배율을 직접 입력 (50~1000%, 범위를 벗어나면 잘라냄) |
+| `Fit` | 100%로 복귀 |
+
+확대 상태에서 한쪽을 드래그하면 반대쪽 패널의 위치가 따라옵니다.
+
+### 테마
+
+**다크가 기본값**이고, 헤더 우측 끝 버튼으로 라이트와 전환합니다. 선택은 `localStorage`에 저장되고, 첫 페인트 전에 적용되어 새로고침 시 깜빡이지 않습니다.
 
 ---
 
@@ -134,11 +151,12 @@ Worker를 만들 수 없는 환경에서는 `lib/image/encode-client.ts`가 **�
 app/            라우트, API 스텁
 components/ui/  shadcn 스타일 primitive
 constants/      기본 옵션, 지원 포맷, 용량 제한
-features/       화면 단위 컴포넌트 (upload/media/image/video/download)
+features/       화면 단위 컴포넌트 (upload/media/image/video/download/theme)
 lib/
   ffmpeg/       영상 인자 생성 · FFmpeg.wasm 클라이언트
   image/        인코더 · 목표 용량 탐색 · Worker 클라이언트
   media/        파일명 · 리사이즈 · 압축 규칙 · ZIP · 메타데이터
+  theme.ts      테마 저장·적용
   validation/   업로드 검증
 stores/         Zustand 상태
 workers/        이미지 인코딩 Worker
@@ -148,6 +166,18 @@ workers/        이미지 인코딩 Worker
 
 Next.js App Router · React · TypeScript · Tailwind CSS · Zustand · Vitest
 Canvas / OffscreenCanvas · `@jsquash/avif` · `@jsquash/oxipng` · FFmpeg.wasm · JSZip · file-saver
+
+### 디자인 시스템
+
+`DESIGN-vercel.md`의 **Geist** 시스템을 따릅니다.
+
+- **타이포그래피** — Geist Sans / Geist Mono (`next/font/google`로 자체 호스팅). 제목은 weight 600에 음수 자간, 모노는 코드·수치·eyebrow 라벨 전용
+- **색** — 잉크 하나가 제목·CTA·테두리를 모두 담당하는 흑백 이중주. 잉크 계단은 `ink → body → muted-foreground → faint`
+- **장식** — 유일한 색 표현은 헤더의 mesh gradient(cyan→blue→violet→magenta→amber). 그 외 accent는 chrome으로 쓰지 않습니다
+- **모양** — 앱·내비 크롬은 6px 사각(`rounded-sm`), 콘텐츠 카드는 12~16px. pill은 마케팅 CTA 전용이라 이 앱에서는 쓰지 않습니다
+- **깊이** — 1px hairline이 먼저고 그림자는 `shadow-whisper` / `shadow-floating`까지만
+
+토큰은 `app/globals.css`의 CSS 변수에 있고 `tailwind.config.ts`가 이를 노출합니다. 다크가 `:root`, 라이트가 `:root.light` 오버라이드입니다.
 
 ---
 
@@ -210,6 +240,6 @@ AI 화질 개선 · 대용량 서버 큐 · AV1 코덱(FFmpeg 코어에 인코�
 
 ```bash
 npm run typecheck   # 0 errors
-npm test            # 29 files / 155 tests
+npm test            # 32 files / 182 tests
 npm run build       # 성공 (jsquash wasm 관련 경고 2건은 무해)
 ```

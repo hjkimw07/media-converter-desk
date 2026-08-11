@@ -7,8 +7,8 @@ import {
   FileStack,
   HardDrive,
   ImageIcon,
+  ListChecks,
   Settings,
-  Trash2,
   VideoIcon,
   X,
 } from "lucide-react";
@@ -16,12 +16,14 @@ import { saveAs } from "file-saver";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DownloadPanel } from "@/features/download/download-panel";
 import { ImageSettingsPanel } from "@/features/image/image-settings-panel";
 import { ArchiveNamingPanel } from "@/features/media/archive-naming-panel";
 import { BatchFileList } from "@/features/media/batch-file-list";
 import { OutputNamingPanel } from "@/features/media/output-naming-panel";
 import { PreviewPanel } from "@/features/media/preview-panel";
+import { ThemeToggle } from "@/features/theme/theme-toggle";
 import { FileUploader } from "@/features/upload/file-uploader";
 import { VideoSettingsPanel } from "@/features/video/video-settings-panel";
 import { processVideoInBrowser } from "@/lib/ffmpeg/client";
@@ -55,6 +57,20 @@ import type {
   VideoProcessOptions,
 } from "@/types/media";
 
+/**
+ * 지표 아이콘 색. 넓은 면이 아니라 아이콘에만 쓰는 작은 accent라
+ * "accent를 chrome으로 쓰지 않는다"는 규칙을 지키면서 구분을 살립니다.
+ */
+const METRIC_TONE_CLASS: Record<string, string> = {
+  neutral: "text-ink",
+  image: "text-link",
+  video: "text-accent-violet",
+  selected: "text-warning",
+  converted: "text-accent-cyan",
+  inputSize: "text-faint",
+  outputSize: "text-accent-pink",
+};
+
 type UploadErrorItem = {
   id: string;
   fileName: string;
@@ -66,6 +82,7 @@ export function MediaWorkspace() {
   const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set());
   const [leftPanelWidth, setLeftPanelWidth] = useState(DEFAULT_LEFT_PANEL_WIDTH);
   const [isInspectorOpen, setInspectorOpen] = useState(false);
+  const [isClearConfirmOpen, setClearConfirmOpen] = useState(false);
   const items = useMediaStore((state) => state.items);
   const selectedId = useMediaStore((state) => state.selectedId);
   const imageOptions = useMediaStore((state) => state.imageOptions);
@@ -384,6 +401,7 @@ export function MediaWorkspace() {
     clearItems();
     setCheckedIds(new Set());
     setUploadErrors([]);
+    setClearConfirmOpen(false);
   }, [clearItems]);
 
   const applyTemplateToCheckedResults = useCallback(() => {
@@ -439,28 +457,32 @@ export function MediaWorkspace() {
   return (
     <main className="min-h-[100svh] bg-background text-foreground xl:h-[100svh] xl:overflow-hidden">
       <div className="flex min-h-[100svh] flex-col xl:h-full xl:min-h-0">
-        <header className="shrink-0 border-b border-border bg-card">
+        <header className="mesh-gradient shrink-0 border-b border-border bg-card">
           <div className="mx-auto flex w-full max-w-[1760px] flex-col gap-3 px-3 py-3 lg:px-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-center gap-4">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-sm border border-primary bg-primary text-primary-foreground">
                 <FileStack aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-xl font-semibold leading-7 text-white">Media Convert Desk</h1>
-                <p className="hidden truncate text-sm leading-5 text-muted-foreground md:block">
+                <h1 className="truncate text-xl font-semibold leading-7 tracking-[-0.4px] text-ink">Media Convert Desk</h1>
+                <p className="hidden truncate text-sm leading-5 text-body md:block">
                   이미지와 짧은 영상을 로컬에서 변환하고, 서버/AI 처리는 후속 확장 지점으로 분리합니다.
                 </p>
               </div>
+              <ThemeToggle className="ml-auto xl:hidden" />
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:min-w-[900px] xl:grid-cols-7 2xl:min-w-[980px]">
-              <Metric icon={FileStack} value={items.length} label="Total" tone="neutral" />
-              <Metric icon={ImageIcon} value={imageCount} label="Images" tone="image" />
-              <Metric icon={VideoIcon} value={videoCount} label="Videos" tone="video" />
-              <Metric icon={CheckSquare} value={checkedItems.length} label="Selected" tone="selected" />
-              <Metric icon={CheckCircle2} value={convertedCount} label="Converted" tone="converted" />
-              <Metric icon={HardDrive} value={formatBytes(totalInputSize)} label="Input Total Size" tone="inputSize" />
-              <Metric icon={Download} value={formatBytes(totalOutputSize)} label="Output Total Size" tone="outputSize" />
+            <div className="flex items-center gap-2">
+              <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3 xl:min-w-[900px] xl:grid-cols-7 2xl:min-w-[980px]">
+                <Metric icon={FileStack} value={items.length} label="Total" tone="neutral" />
+                <Metric icon={ImageIcon} value={imageCount} label="Images" tone="image" />
+                <Metric icon={VideoIcon} value={videoCount} label="Videos" tone="video" />
+                <Metric icon={CheckSquare} value={checkedItems.length} label="Selected" tone="selected" />
+                <Metric icon={CheckCircle2} value={convertedCount} label="Converted" tone="converted" />
+                <Metric icon={HardDrive} value={formatBytes(totalInputSize)} label="Input Total Size" tone="inputSize" />
+                <Metric icon={Download} value={formatBytes(totalOutputSize)} label="Output Total Size" tone="outputSize" />
+              </div>
+              <ThemeToggle className="hidden xl:inline-flex" />
             </div>
           </div>
         </header>
@@ -497,23 +519,15 @@ export function MediaWorkspace() {
             >
               <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border p-3">
                 <div className="min-w-0">
-                  <h2 className="text-base font-semibold leading-6">Source queue</h2>
+                  <h2 className="flex items-center gap-2 text-base font-semibold leading-6 text-ink">
+                    <ListChecks aria-hidden="true" className="size-4 shrink-0 text-link" />
+                    Source queue
+                  </h2>
                   <p className="font-brand-mono text-xs text-muted-foreground">
                     {formatBytes(totalInputSize)} input · {formatBytes(totalOutputSize)} output
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
-                  <Button
-                    aria-label="Clear all source media"
-                    className="h-8 px-2 text-xs"
-                    disabled={items.length === 0}
-                    size="sm"
-                    variant="ghost"
-                    onClick={clearSourceMedia}
-                  >
-                    <Trash2 data-icon="inline-start" />
-                    전체 삭제
-                  </Button>
                   <Badge variant="secondary">{items.length} files</Badge>
                 </div>
               </div>
@@ -532,6 +546,7 @@ export function MediaWorkspace() {
                 onReorder={reorderItems}
                 onSelect={selectItem}
                 onToggleAll={toggleAllChecked}
+                onClearAll={() => setClearConfirmOpen(true)}
                 onToggleChecked={toggleCheckedItem}
               />
             </section>
@@ -556,8 +571,8 @@ export function MediaWorkspace() {
                   aria-label="Open settings"
                   aria-pressed={isInspectorOpen}
                   className={cn(
-                    "size-9 shrink-0 border-white bg-white p-0 text-black shadow-[0_0_0_1px_hsl(var(--foreground)/0.12)] transition-all duration-200 hover:border-white hover:bg-white/90 hover:text-black [&_svg]:transition-transform [&_svg]:duration-300",
-                    isInspectorOpen && "bg-white text-black shadow-[0_0_0_2px_hsl(var(--primary)/0.45)] [&_svg]:rotate-90",
+                    "size-9 shrink-0 border-primary bg-primary p-0 text-primary-foreground transition-all duration-200 hover:bg-primary/85 [&_svg]:transition-transform [&_svg]:duration-300",
+                    isInspectorOpen && "[&_svg]:rotate-90",
                   )}
                   size="icon"
                   title="Settings"
@@ -605,6 +620,16 @@ export function MediaWorkspace() {
           />
         </div>
       </div>
+
+      <ConfirmDialog
+        confirmLabel="전체 삭제"
+        description={`큐에 있는 ${items.length}개 항목과 변환 결과가 모두 사라집니다. 이 동작은 되돌릴 수 없습니다.`}
+        destructive
+        open={isClearConfirmOpen}
+        title="소스 큐를 전체 삭제할까요?"
+        onCancel={() => setClearConfirmOpen(false)}
+        onConfirm={clearSourceMedia}
+      />
     </main>
   );
 }
@@ -626,21 +651,19 @@ function Metric({
     <div
       data-testid={testId}
       className={cn(
-        "flex min-w-0 items-center gap-2 rounded-md border border-border bg-secondary px-2 py-1.5",
-        tone === "image" && "text-cyan-300",
-        tone === "video" && "text-amber-300",
-        tone === "selected" && "text-lime-300",
-        tone === "converted" && "text-emerald-300",
-        tone === "inputSize" && "text-sky-300",
-        tone === "outputSize" && "text-violet-300",
-        tone === "neutral" && "text-foreground",
+        "flex min-w-0 items-center gap-2 rounded-md border border-border bg-secondary px-2 py-1.5 transition-colors duration-150 hover:border-foreground/25",
       )}
     >
-      <div className="hidden size-7 shrink-0 items-center justify-center rounded-sm border border-border bg-background sm:flex">
+      <div
+        className={cn(
+          "hidden size-7 shrink-0 items-center justify-center rounded-sm border border-border bg-background transition-colors duration-150 sm:flex",
+          METRIC_TONE_CLASS[tone],
+        )}
+      >
         <Icon aria-hidden="true" />
       </div>
       <div className="min-w-0">
-        <p className="font-brand-mono truncate text-base font-semibold leading-5">{value}</p>
+        <p className="font-brand-mono truncate text-base font-semibold leading-5 text-ink">{value}</p>
         <p className="truncate text-xs text-muted-foreground" title={label}>
           {label}
         </p>
@@ -692,7 +715,7 @@ function InspectorDrawer({
     >
       <button
         aria-label="Close settings overlay"
-        className="absolute inset-0 bg-black/55 transition-opacity duration-200"
+        className="absolute inset-0 bg-ink/40 transition-opacity duration-200"
         type="button"
         onClick={onClose}
       />
@@ -704,7 +727,10 @@ function InspectorDrawer({
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border p-4">
           <div className="min-w-0">
-            <h2 className="text-base font-semibold leading-6">Settings</h2>
+            <h2 className="flex items-center gap-2 text-base font-semibold leading-6 text-ink">
+              <Settings aria-hidden="true" className="size-4 shrink-0 text-link" />
+              Settings
+            </h2>
             <p className="truncate text-sm leading-5 text-muted-foreground">
               {selectedItem ? selectedItem.name : "큐에서 항목을 선택하면 설정이 활성화됩니다."}
             </p>

@@ -82,7 +82,7 @@ export function FileUploader({ onFilesSelected }: FileUploaderProps) {
         void submitDroppedItems(event.dataTransfer);
       }}
       className={cn(
-        "rounded-md border border-dashed hairline-dashed bg-card p-3 transition-colors",
+        "rounded-md border border-dashed hairline-dashed bg-card p-3 transition-[border-color,background-color] duration-200",
         isDragging && "border-primary bg-secondary",
       )}
     >

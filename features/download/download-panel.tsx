@@ -108,9 +108,9 @@ function StatusPill({
       className={cn(
         "flex min-w-0 items-center justify-center gap-2 px-2 text-xs leading-5",
         isFirst ? "border-l-0 xl:border-l xl:border-border" : "border-l border-border",
-        tone === "converted" && "text-emerald-300",
-        tone === "pending" && "text-amber-300",
-        tone === "failed" && "text-red-300",
+        tone === "converted" && "text-link",
+        tone === "pending" && "text-warning-deep",
+        tone === "failed" && "text-destructive",
       )}
     >
       <Icon aria-hidden="true" className="size-4 shrink-0" />
