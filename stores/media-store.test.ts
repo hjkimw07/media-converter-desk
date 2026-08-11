@@ -36,6 +36,7 @@ describe("useMediaStore", () => {
       outputName: "sample.webp",
       size: 1,
       mimeType: "image/webp",
+      savedBytes: 0,
     });
 
     expect(useMediaStore.getState().items[0].result?.size).toBe(blob.size);
@@ -67,6 +68,7 @@ describe("useMediaStore", () => {
         mimeType: "image/webp",
         width: 320,
         height: 240,
+        savedBytes: 0,
       },
       warnings: [],
     } as UploadedMedia;

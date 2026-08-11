@@ -58,5 +58,6 @@ function createResult(outputName: string): ProcessResult {
     mimeType: "image/webp",
     width: 80,
     height: 40,
+    savedBytes: 0,
   };
 }

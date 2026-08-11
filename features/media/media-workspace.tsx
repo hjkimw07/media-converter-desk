@@ -96,8 +96,10 @@ export function MediaWorkspace() {
   );
   const checkedItems = useMemo(() => items.filter((item) => checkedIds.has(item.id)), [checkedIds, items]);
   const isProcessing = items.some((item) => item.status === "processing" || item.status === "pending");
-  const imageCount = items.filter((item) => item.type === "image").length;
-  const videoCount = items.filter((item) => item.type === "video").length;
+  // 미지원 파일은 확장자를 못 읽어 image로 분류되므로(getFallbackMediaType) 집계에서 제외합니다.
+  const convertibleItems = items.filter((item) => !isUnsupportedMediaItem(item));
+  const imageCount = convertibleItems.filter((item) => item.type === "image").length;
+  const videoCount = convertibleItems.filter((item) => item.type === "video").length;
   const convertedCount = items.filter((item) => item.result).length;
   const totalInputSize = items.reduce((total, item) => total + item.size, 0);
   const totalOutputSize = items.reduce((total, item) => total + (item.result?.size ?? 0), 0);

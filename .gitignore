@@ -8,3 +8,5 @@ coverage/
 .env*.local
 .playwright-cli/
 output/
+.claude
+AGENTS.md

@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState, type PointerEvent } from "react";
 import { ArrowRight, ImageIcon, Maximize2, Minus, Plus, VideoIcon } from "lucide-react";
-import type { UploadedMedia } from "@/types/media";
+import type { ApiError, MediaWarning, UploadedMedia } from "@/types/media";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatBytes, formatPercentChange } from "@/lib/media/format";
@@ -122,18 +122,59 @@ export function PreviewPanel({ item, action }: PreviewPanelProps) {
                 onPanChange={syncPreviewPan}
               />
               <PreviewMetadata title="After metadata" rows={metadata.after} />
+              <ConversionWarnings warnings={item.result.warnings} />
             </>
           ) : (
             <>
               <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-dashed hairline-dashed bg-secondary/40 p-4 text-center text-sm text-muted-foreground">
                 변환 결과 대기 중
               </div>
+              <ConversionError error={item.error} />
               <PreviewMetadata title="After metadata" rows={metadata.after} />
             </>
           )}
         </PreviewPane>
       </div>
     </section>
+  );
+}
+
+/** 변환 실패 사유를 보여줍니다. 원인 파악에 필요한 기술 상세는 접어서 함께 제공합니다. */
+function ConversionError({ error }: { error?: ApiError }) {
+  if (!error) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive-foreground">
+      <p className="font-medium">{error.message}</p>
+      {error.detail ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-muted-foreground">자세히</summary>
+          <p className="font-brand-mono mt-1 break-all text-muted-foreground">{error.detail}</p>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+/** 변환은 성공했지만 사용자가 알아야 할 결과(목표 용량 미달, 원본 유지 등)를 보여줍니다. */
+function ConversionWarnings({ warnings }: { warnings?: MediaWarning[] }) {
+  if (!warnings || warnings.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="flex flex-col gap-2">
+      {warnings.map((warning) => (
+        <li
+          key={warning.code}
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+        >
+          {warning.message}
+        </li>
+      ))}
+    </ul>
   );
 }
 

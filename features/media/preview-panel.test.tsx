@@ -217,7 +217,28 @@ function createConvertedImage() {
       mimeType: "image/webp",
       width: 320,
       height: 240,
+      savedBytes: 0,
     },
     warnings: [],
   } as UploadedMedia;
 }
+
+describe("PreviewPanel - 변환 경고", () => {
+  it("결과에 경고가 있으면 화면에 표시해야 한다", () => {
+    const item = createConvertedImage();
+    item.result = {
+      ...item.result!,
+      warnings: [{ code: "target_size_unreachable", message: "품질 40까지 낮춰도 목표 용량에 도달하지 못했습니다." }],
+    };
+
+    render(<PreviewPanel item={item} />);
+
+    expect(screen.getByText(/목표 용량에 도달하지 못했습니다/)).toBeInTheDocument();
+  });
+
+  it("경고가 없으면 경고 영역을 그리지 않아야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    expect(screen.queryByText(/목표 용량에 도달하지 못했습니다/)).not.toBeInTheDocument();
+  });
+});
