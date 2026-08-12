@@ -27,6 +27,20 @@ export function largeStepZoom(current: number, direction: 1 | -1): number {
 }
 
 /**
+ * 배율이 바뀔 때 화면 중앙이 계속 같은 지점을 가리키도록 스크롤 위치를 다시 계산합니다.
+ * 보정하지 않으면 스크롤이 0에 남아 확대할수록 좌상단 여백만 보이고,
+ * 사용자가 매번 드래그해서 이미지를 찾아와야 합니다.
+ *
+ * @param scroll 현재 스크롤 오프셋(px)
+ * @param viewport 보이는 영역의 길이(px)
+ * @param scale 새 배율 / 이전 배율
+ * @returns 보정된 스크롤 오프셋(px). 브라우저가 상한은 알아서 자르므로 하한만 막습니다.
+ */
+export function anchorScrollToCenter(scroll: number, viewport: number, scale: number): number {
+  return Math.max(0, (scroll + viewport / 2) * scale - viewport / 2);
+}
+
+/**
  * 사용자가 직접 입력한 값을 배율로 바꿉니다.
  * 숫자가 아니면 `undefined`를 돌려 호출부가 입력 중 상태를 유지하게 합니다.
  */

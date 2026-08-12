@@ -35,6 +35,55 @@ describe("BatchFileList", () => {
     expect(onSelect).toHaveBeenCalledWith("a");
   });
 
+  it("체크박스를 칸 가운데에 두고 행 요소들을 세로 가운데로 맞춰야 한다", () => {
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[createItem("a", "sample.png")]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    const checkbox = screen.getByLabelText("Select sample.png");
+
+    expect(checkbox).toHaveClass("justify-self-center");
+    // mt-* 눈대중 보정 없이 그리드 정렬만으로 맞춰야 한다.
+    expect(checkbox).not.toHaveClass("mt-3");
+    expect(screen.getByLabelText("Reorder sample.png")).not.toHaveClass("mt-2");
+    expect(screen.getByTestId("media-row-a")).toHaveClass("items-center");
+  });
+
+  it("드래그 핸들은 보이는 크기보다 넓게 잡히고 터치 스크롤을 막아야 한다", () => {
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[createItem("a", "sample.png")]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    const handle = screen.getByLabelText("Reorder sample.png");
+
+    // 보이는 크기는 그대로 두고 ::before로만 잡는 영역을 넓힙니다.
+    expect(handle).toHaveClass("size-6", "relative", "before:-inset-2");
+    // touch-action이 풀리면 브라우저가 스크롤로 판정해 드래그가 취소됩니다.
+    expect(handle).toHaveClass("touch-none");
+  });
+
   it("selects a media row for preview without starting a reorder", () => {
     const onSelect = vi.fn();
     const onReorder = vi.fn();
@@ -281,6 +330,151 @@ describe("BatchFileList", () => {
     expect(onReorder).toHaveBeenCalledWith("c", "b", "before");
   });
 
+  it("여러 행을 지나며 끌어도 손을 뗀 자리로 한 번만 옮겨야 한다", () => {
+    const onReorder = vi.fn();
+
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[createItem("a", "first.png"), createItem("b", "second.png"), createItem("c", "third.png")]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={onReorder}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    const handle = screen.getByLabelText("Reorder first.png");
+
+    fireEvent.pointerDown(handle);
+
+    // b를 지나 c까지 끕니다. 지나가는 동안에는 순서가 바뀌면 안 됩니다.
+    mockElementDragTarget(screen.getByTestId("media-row-b"), { top: 100, height: 40 });
+    firePointerMove(handle, { clientX: 20, clientY: 104 });
+    expect(onReorder).not.toHaveBeenCalled();
+
+    mockElementDragTarget(screen.getByTestId("media-row-c"), { top: 140, height: 40 });
+    firePointerMove(handle, { clientX: 20, clientY: 176 });
+    expect(onReorder).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(handle);
+
+    expect(onReorder).toHaveBeenCalledOnce();
+    expect(onReorder).toHaveBeenCalledWith("a", "c", "after");
+  });
+
+  it("끌다가 취소되면 순서를 바꾸지 않아야 한다", () => {
+    const onReorder = vi.fn();
+
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[createItem("a", "first.png"), createItem("b", "second.png")]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={onReorder}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    const handle = screen.getByLabelText("Reorder first.png");
+
+    mockElementDragTarget(screen.getByTestId("media-row-b"), { top: 100, height: 40 });
+    fireEvent.pointerDown(handle);
+    firePointerMove(handle, { clientX: 20, clientY: 132 });
+    fireEvent.pointerCancel(handle);
+
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it("전체 접기·펼치기로 모든 그룹을 한 번에 여닫아야 한다", () => {
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[
+          createItem("a", "photo.png", 0, false, "Trip/photo.png"),
+          createItem("b", "clip.png", 0, false, "Work/clip.png"),
+        ]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    expect(screen.getByTestId("media-row-a")).toBeInTheDocument();
+    expect(screen.getByTestId("media-row-b")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all groups" }));
+
+    expect(screen.queryByTestId("media-row-a")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("media-row-b")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
+
+    expect(screen.getByTestId("media-row-a")).toBeInTheDocument();
+    expect(screen.getByTestId("media-row-b")).toBeInTheDocument();
+  });
+
+  it("그룹 하나를 따로 접어도 전체 접기 버튼은 남은 그룹을 마저 접어야 한다", () => {
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[
+          createItem("a", "photo.png", 0, false, "Trip/photo.png"),
+          createItem("b", "clip.png", 0, false, "Work/clip.png"),
+        ]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse folder Trip" }));
+    expect(screen.queryByTestId("media-row-a")).not.toBeInTheDocument();
+    expect(screen.getByTestId("media-row-b")).toBeInTheDocument();
+
+    // 일부만 접힌 상태에서는 여전히 "전체 접기"여야 한다.
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all groups" }));
+    expect(screen.queryByTestId("media-row-b")).not.toBeInTheDocument();
+  });
+
+  it("그룹 머리글이 없으면 전체 접기 버튼도 없어야 한다", () => {
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[createItem("a", "sample.png")]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /all groups/ })).not.toBeInTheDocument();
+  });
+
   it("does not start drag reorder from the regular row surface", () => {
     const onReorder = vi.fn();
 
@@ -447,6 +641,7 @@ describe("BatchFileList", () => {
     mockElementDragTarget(screen.getByTestId("media-group-Trip"), { top: 100, height: 80 });
     fireEvent.pointerDown(screen.getByLabelText("Reorder group 개별 파일"));
     firePointerMove(screen.getByLabelText("Reorder group 개별 파일"), { clientX: 20, clientY: 104 });
+    fireEvent.pointerUp(screen.getByLabelText("Reorder group 개별 파일"));
 
     expect(onReorderGroup).toHaveBeenCalledWith("__loose_media__", "Trip", "before");
   });
@@ -472,6 +667,10 @@ describe("BatchFileList", () => {
 
     expect(screen.getByTestId("folder-group-icon-Trip")).toBeInTheDocument();
     expect(screen.queryByTestId("folder-group-icon-__loose_media__")).not.toBeInTheDocument();
+
+    // 개별 파일 묶음은 폴더가 아니라 낱장 파일 아이콘으로 구분합니다.
+    expect(screen.getByTestId("loose-group-icon-__loose_media__")).toBeInTheDocument();
+    expect(screen.queryByTestId("loose-group-icon-Trip")).not.toBeInTheDocument();
   });
 
   it("collapses and expands folder-uploaded groups without deleting items", () => {

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { PROJECT_AUTHOR, PROJECT_NAME } from "@/constants/project";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
 import "./globals.css";
 
@@ -8,8 +9,11 @@ const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans", dis
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Image / Video Converter MVP",
+  title: PROJECT_NAME,
   description: "Browser-first image and video conversion MVP with future server processing stubs.",
+  applicationName: PROJECT_NAME,
+  authors: [{ name: PROJECT_AUTHOR }],
+  creator: PROJECT_AUTHOR,
 };
 
 /**

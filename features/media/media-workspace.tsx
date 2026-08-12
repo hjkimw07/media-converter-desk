@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties, type Poi
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PROJECT_NAME } from "@/constants/project";
 import { DownloadPanel } from "@/features/download/download-panel";
 import { ImageSettingsPanel } from "@/features/image/image-settings-panel";
 import { ArchiveNamingPanel } from "@/features/media/archive-naming-panel";
@@ -31,7 +32,7 @@ import { processImageInBrowser } from "@/lib/image/process-image";
 import { createUniqueArchivePath, getArchiveFilename, getZipOutputPath } from "@/lib/media/archive";
 import { getDownloadDeliveryMode } from "@/lib/media/download-selection";
 import { createOutputFilename } from "@/lib/media/filenames";
-import { getMediaFolderKey } from "@/lib/media/folders";
+import { getMediaFolderKey, getMediaFolderLabel } from "@/lib/media/folders";
 import { formatBytes } from "@/lib/media/format";
 import { extractImageMetadata, extractVideoMetadata } from "@/lib/media/metadata";
 import {
@@ -83,6 +84,7 @@ export function MediaWorkspace() {
   const [leftPanelWidth, setLeftPanelWidth] = useState(DEFAULT_LEFT_PANEL_WIDTH);
   const [isInspectorOpen, setInspectorOpen] = useState(false);
   const [isClearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [folderKeyPendingRemoval, setFolderKeyPendingRemoval] = useState<string>();
   const items = useMediaStore((state) => state.items);
   const selectedId = useMediaStore((state) => state.selectedId);
   const imageOptions = useMediaStore((state) => state.imageOptions);
@@ -381,21 +383,32 @@ export function MediaWorkspace() {
     [items],
   );
 
-  const removeFolderItems = useCallback(
-    (folderKey: string) => {
-      const idsToRemove = items
-        .filter((item) => getMediaFolderKey(item.file) === folderKey)
-        .map((item) => item.id);
+  const folderPendingRemoval = useMemo(() => {
+    if (!folderKeyPendingRemoval) {
+      return undefined;
+    }
 
-      idsToRemove.forEach(removeItem);
-      setCheckedIds((current) => {
-        const next = new Set(current);
-        idsToRemove.forEach((id) => next.delete(id));
-        return next;
-      });
-    },
-    [items, removeItem],
-  );
+    const groupItems = items.filter((item) => getMediaFolderKey(item.file) === folderKeyPendingRemoval);
+
+    return {
+      count: groupItems.length,
+      label: (groupItems[0] && getMediaFolderLabel(groupItems[0].file)) ?? folderKeyPendingRemoval,
+    };
+  }, [folderKeyPendingRemoval, items]);
+
+  const removeFolderItems = useCallback(() => {
+    const idsToRemove = items
+      .filter((item) => getMediaFolderKey(item.file) === folderKeyPendingRemoval)
+      .map((item) => item.id);
+
+    idsToRemove.forEach(removeItem);
+    setCheckedIds((current) => {
+      const next = new Set(current);
+      idsToRemove.forEach((id) => next.delete(id));
+      return next;
+    });
+    setFolderKeyPendingRemoval(undefined);
+  }, [folderKeyPendingRemoval, items, removeItem]);
 
   const clearSourceMedia = useCallback(() => {
     clearItems();
@@ -464,7 +477,7 @@ export function MediaWorkspace() {
                 <FileStack aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-xl font-semibold leading-7 tracking-[-0.4px] text-ink">Media Convert Desk</h1>
+                <h1 className="truncate text-xl font-semibold leading-7 tracking-[-0.4px] text-ink">{PROJECT_NAME}</h1>
                 <p className="hidden truncate text-sm leading-5 text-body md:block">
                   이미지와 짧은 영상을 로컬에서 변환하고, 서버/AI 처리는 후속 확장 지점으로 분리합니다.
                 </p>
@@ -539,7 +552,7 @@ export function MediaWorkspace() {
                   void downloadSingleItem(id);
                 }}
                 onRemove={removeItem}
-                onRemoveFolder={removeFolderItems}
+                onRemoveFolder={setFolderKeyPendingRemoval}
                 onRename={updateItemName}
                 onRenameFolder={renameFolderGroup}
                 onReorderGroup={reorderGroups}
@@ -567,19 +580,22 @@ export function MediaWorkspace() {
           >
             <PreviewPanel
               action={
+                /*
+                 * 아이콘만 있던 버튼은 옆의 배지·줌 컨트롤에 묻혀 장식으로 읽혔습니다.
+                 * 라벨을 붙이고, 이 헤더에서 유일한 채워진 버튼으로 두어 주 동작임을 드러냅니다.
+                 */
                 <Button
-                  aria-label="Open settings"
-                  aria-pressed={isInspectorOpen}
+                  aria-expanded={isInspectorOpen}
                   className={cn(
-                    "size-9 shrink-0 border-primary bg-primary p-0 text-primary-foreground transition-all duration-200 hover:bg-primary/85 [&_svg]:transition-transform [&_svg]:duration-300",
+                    "shrink-0 [&_svg]:transition-transform [&_svg]:duration-300",
                     isInspectorOpen && "[&_svg]:rotate-90",
                   )}
-                  size="icon"
-                  title="Settings"
-                  variant="secondary"
-                  onClick={openInspector}
+                  size="sm"
+                  title="변환 설정 열기"
+                  onClick={isInspectorOpen ? closeInspector : openInspector}
                 >
                   <Settings aria-hidden="true" />
+                  Settings
                 </Button>
               }
               item={selectedItem}
@@ -629,6 +645,16 @@ export function MediaWorkspace() {
         title="소스 큐를 전체 삭제할까요?"
         onCancel={() => setClearConfirmOpen(false)}
         onConfirm={clearSourceMedia}
+      />
+
+      <ConfirmDialog
+        confirmLabel="그룹 삭제"
+        description={`"${folderPendingRemoval?.label ?? ""}" 그룹의 ${folderPendingRemoval?.count ?? 0}개 항목과 변환 결과가 사라집니다. 이 동작은 되돌릴 수 없습니다.`}
+        destructive
+        open={Boolean(folderKeyPendingRemoval)}
+        title="이 그룹을 삭제할까요?"
+        onCancel={() => setFolderKeyPendingRemoval(undefined)}
+        onConfirm={removeFolderItems}
       />
     </main>
   );
@@ -715,7 +741,7 @@ function InspectorDrawer({
     >
       <button
         aria-label="Close settings overlay"
-        className="absolute inset-0 bg-ink/40 transition-opacity duration-200"
+        className="scrim absolute inset-0 transition-opacity duration-200"
         type="button"
         onClick={onClose}
       />

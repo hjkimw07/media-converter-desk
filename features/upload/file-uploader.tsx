@@ -1,7 +1,7 @@
 "use client";
 
 import { FolderUp, UploadCloud } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ACCEPTED_MEDIA_MIME_TYPES } from "@/constants/media";
 import { markFilesAsFolderUpload, markFolderSelectionFiles } from "@/lib/media/folders";
@@ -32,8 +32,43 @@ type DataTransferItemWithEntry = DataTransferItem & {
   webkitGetAsEntry?: () => FileSystemEntry | null;
 };
 
+/**
+ * File System Access API. lib.dom에 `showDirectoryPicker`가 없어 필요한 만큼만 선언합니다.
+ * Chromium 계열에만 있어 사용 전에 반드시 존재 여부를 확인합니다.
+ */
+type DirectoryHandle = {
+  kind: "directory";
+  name: string;
+  values: () => AsyncIterableIterator<DirectoryHandle | FileHandle>;
+};
+
+type FileHandle = {
+  kind: "file";
+  name: string;
+  getFile: () => Promise<File>;
+};
+
+type DirectoryPickerWindow = Window & {
+  showDirectoryPicker?: (options?: { mode?: "read" | "readwrite" }) => Promise<DirectoryHandle>;
+};
+
+function getDirectoryPicker() {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  return (window as DirectoryPickerWindow).showDirectoryPicker;
+}
+
 export function FileUploader({ onFilesSelected }: FileUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
+  /*
+   * 디렉터리 선택기는 마운트 뒤에 판별합니다. 서버에는 window가 없어
+   * 렌더 중에 확인하면 하이드레이션이 어긋납니다.
+   */
+  const [canPickDirectory, setCanPickDirectory] = useState(false);
+
+  useEffect(() => setCanPickDirectory(Boolean(getDirectoryPicker())), []);
 
   const submitFiles = useCallback(
     (fileList: FileList | File[]) => {
@@ -56,6 +91,34 @@ export function FileUploader({ onFilesSelected }: FileUploaderProps) {
     },
     [onFilesSelected],
   );
+
+  /**
+   * 디렉터리 선택기로 폴더를 읽습니다.
+   * `<input webkitdirectory>`와 달리 브라우저가 매번 띄우는 업로드 확인창이 없습니다.
+   */
+  const pickDirectory = useCallback(async () => {
+    const showDirectoryPicker = getDirectoryPicker();
+
+    if (!showDirectoryPicker) {
+      return;
+    }
+
+    try {
+      const handle = await showDirectoryPicker({ mode: "read" });
+      const files = markFilesAsFolderUpload(await readDirectoryHandleFiles(handle, handle.name), {
+        label: handle.name,
+      });
+
+      if (files.length > 0) {
+        onFilesSelected(files);
+      }
+    } catch (error) {
+      // ignore: 선택 취소(AbortError)는 정상 흐름입니다. 그 외에는 알립니다.
+      if (!(error instanceof DOMException) || error.name !== "AbortError") {
+        throw error;
+      }
+    }
+  }, [onFilesSelected]);
 
   const submitDroppedItems = useCallback(
     async (dataTransfer: DataTransfer) => {
@@ -112,23 +175,36 @@ export function FileUploader({ onFilesSelected }: FileUploaderProps) {
               Files
             </label>
           </Button>
-          <Button asChild variant="secondary">
-            <label className="cursor-pointer">
-              <input
-                aria-label="Upload a folder"
-                className="sr-only"
-                type="file"
-                multiple
-                {...{ directory: "", webkitdirectory: "" }}
-                onChange={(event) => {
-                  submitFolderFiles(event.currentTarget.files ?? []);
-                  event.currentTarget.value = "";
-                }}
-              />
+          {canPickDirectory ? (
+            <Button
+              aria-label="Upload a folder"
+              variant="secondary"
+              onClick={() => {
+                void pickDirectory();
+              }}
+            >
               <FolderUp data-icon="inline-start" />
               Folder
-            </label>
-          </Button>
+            </Button>
+          ) : (
+            <Button asChild variant="secondary">
+              <label className="cursor-pointer">
+                <input
+                  aria-label="Upload a folder"
+                  className="sr-only"
+                  type="file"
+                  multiple
+                  {...{ directory: "", webkitdirectory: "" }}
+                  onChange={(event) => {
+                    submitFolderFiles(event.currentTarget.files ?? []);
+                    event.currentTarget.value = "";
+                  }}
+                />
+                <FolderUp data-icon="inline-start" />
+                Folder
+              </label>
+            </Button>
+          )}
         </div>
       </div>
     </section>
@@ -156,6 +232,28 @@ async function collectDataTransferFiles(dataTransfer: DataTransfer) {
   );
 
   return files.flat();
+}
+
+/** 디렉터리 핸들을 재귀로 훑어 파일을 모읍니다. 드롭 경로와 같은 상대경로 형식을 붙입니다. */
+async function readDirectoryHandleFiles(handle: DirectoryHandle, path: string): Promise<File[]> {
+  const files: File[] = [];
+
+  for await (const child of handle.values()) {
+    if (isHiddenOrSystemEntry(child.name) || child.name === "__MACOSX") {
+      continue;
+    }
+
+    const childPath = `${path}/${child.name}`;
+
+    if (child.kind === "directory") {
+      files.push(...(await readDirectoryHandleFiles(child, childPath)));
+      continue;
+    }
+
+    files.push(withRelativePath(await child.getFile(), childPath));
+  }
+
+  return files;
 }
 
 async function readEntryFiles(entry: FileSystemEntry): Promise<File[]> {

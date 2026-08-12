@@ -1,6 +1,6 @@
 export type Theme = "dark" | "light";
 
-export const THEME_STORAGE_KEY = "media-convert-desk:theme";
+export const THEME_STORAGE_KEY = "media-convert-board:theme";
 
 /** 다크가 기본값입니다. 저장된 값이 없거나 알 수 없으면 다크로 둡니다. */
 export function normalizeTheme(value: string | null | undefined): Theme {
