@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_PREVIEW_ZOOM,
   MIN_PREVIEW_ZOOM,
+  anchorScrollToCenter,
   clampZoom,
   parseZoomInput,
   largeStepZoom,
@@ -65,5 +66,25 @@ describe("parseZoomInput", () => {
   it("범위를 벗어난 입력은 잘라내야 한다", () => {
     expect(parseZoomInput("5")).toBe(MIN_PREVIEW_ZOOM);
     expect(parseZoomInput("99999")).toBe(MAX_PREVIEW_ZOOM);
+  });
+});
+
+describe("anchorScrollToCenter", () => {
+  it("확대하면 화면 중앙이 같은 지점을 가리키도록 스크롤을 밀어야 한다", () => {
+    // 400px 뷰포트의 중앙은 내용 좌표 200. 2배로 키우면 그 지점은 400이 되므로 중앙에 두려면 200에서 시작한다.
+    expect(anchorScrollToCenter(0, 400, 2)).toBe(200);
+    expect(anchorScrollToCenter(200, 400, 2)).toBe(600);
+  });
+
+  it("축소해서 시작점보다 앞으로 가면 0에서 멈춰야 한다", () => {
+    expect(anchorScrollToCenter(100, 400, 0.5)).toBe(0);
+  });
+
+  it("배율이 그대로면 스크롤도 그대로여야 한다", () => {
+    expect(anchorScrollToCenter(137, 400, 1)).toBe(137);
+  });
+
+  it("뷰포트를 아직 못 잰 상태에서도 음수를 내지 않아야 한다", () => {
+    expect(anchorScrollToCenter(0, 0, 2)).toBe(0);
   });
 });

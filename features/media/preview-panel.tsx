@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
 import { ArrowRight, ChevronsLeft, ChevronsRight, ImageIcon, Layers, Maximize2, Minus, Plus, VideoIcon } from "lucide-react";
 import type { ApiError, MediaWarning, UploadedMedia } from "@/types/media";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { buildPreviewMetadata, type PreviewMetadataRow } from "@/lib/media/previ
 import {
   MAX_PREVIEW_ZOOM,
   MIN_PREVIEW_ZOOM,
+  anchorScrollToCenter,
   parseZoomInput,
   largeStepZoom,
   stepZoom,
@@ -25,6 +26,7 @@ type PreviewPaneKey = "original" | "result";
 
 export function PreviewPanel({ item, action }: PreviewPanelProps) {
   const [zoom, setZoom] = useState(100);
+  const appliedZoomRef = useRef(100);
   const previewFramesRef = useRef<Record<PreviewPaneKey, HTMLDivElement | null>>({
     original: null,
     result: null,
@@ -53,6 +55,30 @@ export function PreviewPanel({ item, action }: PreviewPanelProps) {
     });
   }, []);
 
+  /*
+   * 배율이 바뀌면 두 프레임의 스크롤을 화면 중앙 기준으로 다시 잡습니다.
+   * 이미지 크기는 프레임 대비 zoom% 라 내용 길이가 배율에 정비례하므로,
+   * scrollWidth를 재지 않고 배율 비만으로 정확히 보정됩니다.
+   */
+  useLayoutEffect(() => {
+    const scale = zoom / appliedZoomRef.current;
+
+    appliedZoomRef.current = zoom;
+
+    if (scale === 1) {
+      return;
+    }
+
+    Object.values(previewFramesRef.current).forEach((frame) => {
+      if (!frame) {
+        return;
+      }
+
+      frame.scrollLeft = anchorScrollToCenter(frame.scrollLeft, frame.clientWidth, scale);
+      frame.scrollTop = anchorScrollToCenter(frame.scrollTop, frame.clientHeight, scale);
+    });
+  }, [zoom]);
+
   if (!item) {
     return (
       <section
@@ -60,13 +86,14 @@ export function PreviewPanel({ item, action }: PreviewPanelProps) {
         className="relative flex h-[min(58svh,520px)] min-h-[360px] flex-none items-center justify-center overflow-y-auto rounded-md border border-border bg-card p-4 xl:h-auto xl:min-h-0 xl:flex-1 xl:overflow-hidden"
       >
         {action ? <div className="absolute right-4 top-4 z-10">{action}</div> : null}
-        <div className="m-auto flex max-w-md flex-col items-center gap-5 py-16 text-center">
+        {/* 데스크탑에서는 폭이 넉넉해 안내 문장을 한 줄로 둡니다. 좁은 화면에서는 max-w-md 안에서 접힙니다. */}
+        <div className="m-auto flex max-w-md flex-col items-center gap-5 py-16 text-center xl:max-w-none">
           <div className="flex size-14 items-center justify-center rounded-sm border border-border bg-secondary text-primary">
             <ImageIcon aria-hidden="true" />
           </div>
           <div className="flex flex-col gap-1">
             <h2 className="text-2xl font-semibold leading-8">Queue media to begin</h2>
-            <p className="text-sm leading-6 text-muted-foreground">
+            <p className="text-sm leading-6 text-muted-foreground xl:whitespace-nowrap">
               이미지 또는 짧은 영상을 추가하면 원본과 변환 결과를 같은 캔버스에서 비교합니다.
             </p>
           </div>
@@ -392,6 +419,11 @@ function MediaPreview({
   const stopPan = () => setIsPanning(false);
   const frameClassName =
     "flex h-[220px] shrink-0 overflow-auto rounded-md bg-secondary xl:min-h-[160px] xl:flex-1";
+  /*
+   * 크기 전환을 두지 않습니다. 전환 중에는 내용 길이가 아직 자라지 않아
+   * 중앙 기준 스크롤 보정값이 브라우저에 잘려버리고, 확대 직후 위치가 다시 어긋납니다.
+   */
+  const mediaClassName = "m-auto max-h-none max-w-none shrink-0 rounded-md object-contain";
   const interactiveFrameProps = {
     onPointerCancel: stopPan,
     onPointerDown: startPan,
@@ -410,7 +442,7 @@ function MediaPreview({
       >
         <img
           alt={item.name}
-          className="m-auto max-h-none max-w-none shrink-0 rounded-md object-contain transition-[height,width] duration-150"
+          className={mediaClassName}
           src={src}
           style={mediaStyle}
           draggable={false}
@@ -427,7 +459,7 @@ function MediaPreview({
       {...interactiveFrameProps}
     >
       <video
-        className="m-auto max-h-none max-w-none shrink-0 rounded-md object-contain transition-[height,width] duration-150"
+        className={mediaClassName}
         controls
         muted
         playsInline

@@ -176,7 +176,13 @@ describe("DownloadPanel", () => {
     );
 
     expect(screen.getByTestId("download-selection-summary")).toHaveClass("xl:min-h-10");
-    expect(screen.getByTestId("download-panel")).toHaveClass("xl:min-h-[72px]");
     expect(screen.getByTestId("download-panel-layout")).toHaveClass("xl:items-center");
+    // min-h가 만든 여유 높이를 위아래로 나눠 내용이 세로 가운데에 놓여야 한다.
+    expect(screen.getByTestId("download-panel")).toHaveClass(
+      "xl:min-h-[72px]",
+      "xl:flex",
+      "xl:flex-col",
+      "xl:justify-center",
+    );
   });
 });

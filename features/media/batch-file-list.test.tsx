@@ -35,6 +35,31 @@ describe("BatchFileList", () => {
     expect(onSelect).toHaveBeenCalledWith("a");
   });
 
+  it("체크박스를 칸 가운데에 두고 행 요소들을 세로 가운데로 맞춰야 한다", () => {
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[createItem("a", "sample.png")]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    const checkbox = screen.getByLabelText("Select sample.png");
+
+    expect(checkbox).toHaveClass("justify-self-center");
+    // mt-* 눈대중 보정 없이 그리드 정렬만으로 맞춰야 한다.
+    expect(checkbox).not.toHaveClass("mt-3");
+    expect(screen.getByLabelText("Reorder sample.png")).not.toHaveClass("mt-2");
+    expect(screen.getByTestId("media-row-a")).toHaveClass("items-center");
+  });
+
   it("selects a media row for preview without starting a reorder", () => {
     const onSelect = vi.fn();
     const onReorder = vi.fn();
@@ -281,6 +306,71 @@ describe("BatchFileList", () => {
     expect(onReorder).toHaveBeenCalledWith("c", "b", "before");
   });
 
+  it("여러 행을 지나며 끌어도 손을 뗀 자리로 한 번만 옮겨야 한다", () => {
+    const onReorder = vi.fn();
+
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[createItem("a", "first.png"), createItem("b", "second.png"), createItem("c", "third.png")]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={onReorder}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    const handle = screen.getByLabelText("Reorder first.png");
+
+    fireEvent.pointerDown(handle);
+
+    // b를 지나 c까지 끕니다. 지나가는 동안에는 순서가 바뀌면 안 됩니다.
+    mockElementDragTarget(screen.getByTestId("media-row-b"), { top: 100, height: 40 });
+    firePointerMove(handle, { clientX: 20, clientY: 104 });
+    expect(onReorder).not.toHaveBeenCalled();
+
+    mockElementDragTarget(screen.getByTestId("media-row-c"), { top: 140, height: 40 });
+    firePointerMove(handle, { clientX: 20, clientY: 176 });
+    expect(onReorder).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(handle);
+
+    expect(onReorder).toHaveBeenCalledOnce();
+    expect(onReorder).toHaveBeenCalledWith("a", "c", "after");
+  });
+
+  it("끌다가 취소되면 순서를 바꾸지 않아야 한다", () => {
+    const onReorder = vi.fn();
+
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[createItem("a", "first.png"), createItem("b", "second.png")]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={onReorder}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    const handle = screen.getByLabelText("Reorder first.png");
+
+    mockElementDragTarget(screen.getByTestId("media-row-b"), { top: 100, height: 40 });
+    fireEvent.pointerDown(handle);
+    firePointerMove(handle, { clientX: 20, clientY: 132 });
+    fireEvent.pointerCancel(handle);
+
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
   it("does not start drag reorder from the regular row surface", () => {
     const onReorder = vi.fn();
 
@@ -447,6 +537,7 @@ describe("BatchFileList", () => {
     mockElementDragTarget(screen.getByTestId("media-group-Trip"), { top: 100, height: 80 });
     fireEvent.pointerDown(screen.getByLabelText("Reorder group 개별 파일"));
     firePointerMove(screen.getByLabelText("Reorder group 개별 파일"), { clientX: 20, clientY: 104 });
+    fireEvent.pointerUp(screen.getByLabelText("Reorder group 개별 파일"));
 
     expect(onReorderGroup).toHaveBeenCalledWith("__loose_media__", "Trip", "before");
   });

@@ -163,6 +163,52 @@ describe("PreviewPanel", () => {
     expect(resultFrame.scrollTop).toBe(260);
   });
 
+  it("확대하면 두 프레임의 스크롤을 중앙 기준으로 다시 잡아야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    const [originalFrame, resultFrame] = screen.getAllByTestId("media-preview-frame");
+    const frameSize = {
+      clientHeight: 200,
+      clientWidth: 400,
+      scrollHeight: 200,
+      scrollLeft: 0,
+      scrollTop: 0,
+      scrollWidth: 400,
+    };
+
+    setScrollState(originalFrame, frameSize);
+    setScrollState(resultFrame, frameSize);
+
+    // 100% → 200%. 중앙(내용 좌표 200·100)이 두 배가 되므로 그만큼 스크롤이 밀려야 한다.
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in by 100 percent" }));
+
+    expect(originalFrame.scrollLeft).toBe(200);
+    expect(originalFrame.scrollTop).toBe(100);
+    expect(resultFrame.scrollLeft).toBe(200);
+    expect(resultFrame.scrollTop).toBe(100);
+  });
+
+  it("축소해서 원래 크기로 돌아오면 스크롤이 처음 위치로 돌아와야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    const [originalFrame] = screen.getAllByTestId("media-preview-frame");
+
+    setScrollState(originalFrame, {
+      clientHeight: 200,
+      clientWidth: 400,
+      scrollHeight: 200,
+      scrollLeft: 0,
+      scrollTop: 0,
+      scrollWidth: 400,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in by 100 percent" }));
+    fireEvent.click(screen.getByRole("button", { name: "Zoom out by 100 percent" }));
+
+    expect(originalFrame.scrollLeft).toBe(0);
+    expect(originalFrame.scrollTop).toBe(0);
+  });
+
   it("keeps the empty preview canvas compact and internally scrollable on compact viewports", () => {
     render(<PreviewPanel />);
 
@@ -173,6 +219,14 @@ describe("PreviewPanel", () => {
       "xl:h-auto",
       "xl:flex-1",
     );
+  });
+
+  it("데스크탑에서는 빈 상태 안내 문장을 한 줄로 둬야 한다", () => {
+    render(<PreviewPanel />);
+
+    expect(
+      screen.getByText("이미지 또는 짧은 영상을 추가하면 원본과 변환 결과를 같은 캔버스에서 비교합니다."),
+    ).toHaveClass("xl:whitespace-nowrap");
   });
 
   it("keeps uploaded preview content compact with scrollable media frames on compact viewports", () => {

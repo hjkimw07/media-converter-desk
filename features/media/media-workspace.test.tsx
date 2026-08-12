@@ -100,16 +100,16 @@ describe("MediaWorkspace", () => {
     render(<MediaWorkspace />);
 
     const drawer = screen.getByTestId("settings-drawer");
-    const settingsButton = screen.getByRole("button", { name: "Open settings" });
+    const settingsButton = screen.getByRole("button", { name: "Settings" });
 
     expect(drawer).toHaveAttribute("data-state", "closed");
-    expect(settingsButton).toHaveAttribute("aria-pressed", "false");
-    expect(settingsButton).toHaveClass("size-9", "border-primary", "bg-primary", "text-primary-foreground");
-    expect(settingsButton).not.toHaveTextContent("Settings");
+    expect(settingsButton).toHaveAttribute("aria-expanded", "false");
+    // 라벨과 채워진 스타일이 있어야 헤더의 배지 사이에서 눈에 들어옵니다.
+    expect(settingsButton).toHaveClass("bg-primary", "text-primary-foreground");
 
     fireEvent.click(settingsButton);
     expect(drawer).toHaveAttribute("data-state", "open");
-    expect(screen.getByRole("button", { name: "Open settings" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Settings" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Output naming")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
@@ -208,14 +208,38 @@ describe("MediaWorkspace", () => {
     render(<MediaWorkspace />);
 
     expect(screen.queryByRole("button", { name: "Delete selected folder" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Delete folder Trip" }));
 
+    // 그룹 삭제도 확인 다이얼로그를 거칩니다.
+    fireEvent.click(screen.getByRole("button", { name: "Delete folder Trip" }));
+    expect(useMediaStore.getState().items).toHaveLength(3);
+
+    fireEvent.click(screen.getByRole("button", { name: "그룹 삭제" }));
     expect(useMediaStore.getState().items.map((item) => item.id)).toEqual(["loose"]);
 
     // 전체 삭제는 확인 다이얼로그를 거칩니다.
     fireEvent.click(screen.getByRole("button", { name: "Clear all source media" }));
     fireEvent.click(screen.getByRole("button", { name: "전체 삭제" }));
     expect(useMediaStore.getState().items).toHaveLength(0);
+  });
+
+  it("그룹 삭제 확인창에서 취소하면 항목이 남아 있어야 한다", () => {
+    useMediaStore.setState({
+      items: [
+        createItem({ id: "folder-a", name: "a.png", relativePath: "Trip/a.png" }),
+        createItem({ id: "loose", name: "loose.png" }),
+      ],
+      selectedId: "folder-a",
+    });
+
+    render(<MediaWorkspace />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete folder Trip" }));
+    expect(screen.getByRole("alertdialog")).toHaveAccessibleName("이 그룹을 삭제할까요?");
+
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(useMediaStore.getState().items).toHaveLength(2);
   });
 
   it("keeps unsupported files in the source queue and scrolls to them from the warning", async () => {
@@ -285,7 +309,7 @@ describe("MediaWorkspace", () => {
 
     render(<MediaWorkspace />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     fireEvent.change(screen.getByLabelText("Archive filename"), {
       target: { value: "client delivery" },
     });

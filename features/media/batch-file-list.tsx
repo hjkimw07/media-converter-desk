@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type PointerEvent } from "react";
+import { useRef, useState, type PointerEvent } from "react";
 import { Check, CheckCheck, ChevronDown, ChevronRight, Download, Folder, GripVertical, Minus, SquareMinus, Trash2 } from "lucide-react";
 import type { UploadedMedia } from "@/types/media";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +48,9 @@ export function BatchFileList({
 }: BatchFileListProps) {
   const [draggingId, setDraggingId] = useState<string>();
   const [draggingGroupKey, setDraggingGroupKey] = useState<string>();
+  const [itemDropTarget, setItemDropTarget] = useState<DropTarget>();
+  const [groupDropTarget, setGroupDropTarget] = useState<DropTarget>();
+  const listRef = useRef<HTMLDivElement>(null);
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string>();
   const [editingName, setEditingName] = useState("");
@@ -102,19 +105,54 @@ export function BatchFileList({
     setEditingFolderKey(undefined);
     setEditingFolderName("");
   };
+  /*
+   * 끄는 동안에는 목록을 건드리지 않고 놓을 위치만 기억합니다.
+   * 이동할 때마다 순서를 바꾸면 끌고 있는 행이 포인터를 따라와 스스로를 가려버려
+   * (elementFromPoint가 원본 행을 되짚어) 한 칸 이동한 뒤 멈춥니다.
+   * 손을 뗄 때 한 번만 적용하면 이벤트가 촘촘하든 성기든 결과가 같아
+   * 데스크탑·태블릿·모바일에서 동일하게 동작합니다.
+   */
   const handleItemDragMove = (event: PointerEvent<HTMLElement>, sourceId: string) => {
+    autoScrollListEdge(listRef.current, event.clientY);
+
     const target = getPointerDragTarget(event, "mediaRowId");
 
+    // 유효한 자리일 때만 갱신합니다. 자기 행 위를 지날 때 지워버리면
+    // 자동 스크롤로 목록이 밀리는 순간 목표를 잃어 아무 데도 못 놓습니다.
     if (target && target.key !== sourceId) {
-      onReorder(sourceId, target.key, target.placement);
+      setItemDropTarget(target);
     }
   };
+  const commitItemDrag = (sourceId: string) => {
+    if (itemDropTarget && itemDropTarget.key !== sourceId) {
+      onReorder(sourceId, itemDropTarget.key, itemDropTarget.placement);
+    }
+
+    cancelItemDrag();
+  };
+  const cancelItemDrag = () => {
+    setDraggingId(undefined);
+    setItemDropTarget(undefined);
+  };
   const handleGroupDragMove = (event: PointerEvent<HTMLElement>, sourceGroupKey: string) => {
+    autoScrollListEdge(listRef.current, event.clientY);
+
     const target = getPointerDragTarget(event, "mediaGroupKey");
 
     if (target && target.key !== sourceGroupKey) {
-      onReorderGroup?.(sourceGroupKey, target.key, target.placement);
+      setGroupDropTarget(target);
     }
+  };
+  const commitGroupDrag = (sourceGroupKey: string) => {
+    if (groupDropTarget && groupDropTarget.key !== sourceGroupKey) {
+      onReorderGroup?.(sourceGroupKey, groupDropTarget.key, groupDropTarget.placement);
+    }
+
+    cancelGroupDrag();
+  };
+  const cancelGroupDrag = () => {
+    setDraggingGroupKey(undefined);
+    setGroupDropTarget(undefined);
   };
 
   return (
@@ -124,7 +162,7 @@ export function BatchFileList({
         <div className="flex shrink-0 items-center gap-1">
           <Button className="h-8 px-2 text-xs" size="sm" variant="ghost" onClick={() => onToggleAll(!allChecked)}>
             {allChecked ? (
-              <SquareMinus aria-hidden="true" data-icon="inline-start" />
+              <SquareMinus aria-hidden="true" data-icon="inline-start" className="text-warning" />
             ) : (
               <CheckCheck aria-hidden="true" data-icon="inline-start" className="text-link" />
             )}
@@ -138,27 +176,28 @@ export function BatchFileList({
               variant="ghost"
               onClick={onClearAll}
             >
-              <Trash2 aria-hidden="true" data-icon="inline-start" />
+              <Trash2 aria-hidden="true" data-icon="inline-start" className="text-destructive" />
               전체 삭제
             </Button>
           ) : null}
         </div>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3" ref={listRef}>
         {groups.map((group) => (
           <section
             key={group.key}
             className="flex flex-col gap-2"
             data-media-group-key={group.key}
             data-testid={`media-group-${group.key}`}
-            onPointerUp={() => setDraggingGroupKey(undefined)}
-            onPointerCancel={() => setDraggingGroupKey(undefined)}
+            onPointerUp={cancelGroupDrag}
+            onPointerCancel={cancelGroupDrag}
           >
             {shouldShowGroupHeaders ? (
               <div
                 className={cn(
                   "flex min-h-10 items-center justify-between gap-2 rounded-sm border border-border bg-secondary/60 px-2 py-1.5",
                   draggingGroupKey === group.key && "border-primary bg-primary/10",
+                  getDropIndicatorClass(groupDropTarget, group.key),
                 )}
               >
                 <div className="flex min-w-0 items-center gap-2">
@@ -174,18 +213,14 @@ export function BatchFileList({
                           toggleGroupChecked(group.items, checkedIds, onToggleChecked);
                         }}
                       />
-                      <Folder
-                        aria-hidden="true"
-                        className="size-4 shrink-0 text-primary"
-                        data-testid={`folder-group-icon-${group.key}`}
-                      />
                       <GroupDragHandle
                         groupKey={group.key}
                         label={group.label}
                         prefix="folder"
                         onDragStart={setDraggingGroupKey}
                         onDragMove={handleGroupDragMove}
-                        onDragEnd={() => setDraggingGroupKey(undefined)}
+                        onDrop={commitGroupDrag}
+                        onDragCancel={cancelGroupDrag}
                       />
                       <Button
                         aria-expanded={!collapsedGroupKeys.has(group.key)}
@@ -232,7 +267,8 @@ export function BatchFileList({
                         prefix="group"
                         onDragStart={setDraggingGroupKey}
                         onDragMove={handleGroupDragMove}
-                        onDragEnd={() => setDraggingGroupKey(undefined)}
+                        onDrop={commitGroupDrag}
+                        onDragCancel={cancelGroupDrag}
                       />
                       <Button
                         aria-expanded={!collapsedGroupKeys.has(group.key)}
@@ -262,6 +298,14 @@ export function BatchFileList({
                       </Button>
                     </>
                   )}
+                  {/* 폴더 아이콘은 이름 바로 왼쪽에 붙여 무엇의 이름인지 한눈에 보이게 합니다. */}
+                  {group.isFolder ? (
+                    <Folder
+                      aria-hidden="true"
+                      className="size-4 shrink-0 text-primary"
+                      data-testid={`folder-group-icon-${group.key}`}
+                    />
+                  ) : null}
                   {group.isFolder && editingFolderKey === group.key ? (
                     <input
                       aria-label={`Rename folder ${group.label}`}
@@ -310,13 +354,13 @@ export function BatchFileList({
                   <div className="flex shrink-0 items-center gap-1">
                     <Button
                       aria-label={`Delete folder ${group.label}`}
-                      className="h-7 px-2 text-xs"
+                      className="h-7 px-2 text-xs hover:text-destructive"
                       size="sm"
                       variant="ghost"
                       onClick={() => onRemoveFolder(group.key)}
                     >
                       <Trash2 data-icon="inline-start" />
-                      삭제
+                      그룹 삭제
                     </Button>
                   </div>
                 ) : null}
@@ -345,21 +389,21 @@ export function BatchFileList({
                           onSelect(item.id);
                         }
                       }}
-                      onPointerUp={() => {
-                        setDraggingId(undefined);
-                      }}
-                      onPointerCancel={() => setDraggingId(undefined)}
+                      onPointerUp={cancelItemDrag}
+                      onPointerCancel={cancelItemDrag}
                       className={cn(
-                        "group relative grid w-full cursor-pointer grid-cols-[28px_24px_minmax(0,1fr)_auto] items-start gap-2 rounded-md border border-border bg-background p-2 transition-[border-color,background-color,transform] duration-150 ease-out hover:border-foreground/30 hover:bg-secondary/60 active:scale-[0.995] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        // 체크박스·핸들·액션을 행 세로 가운데에 맞춥니다. mt-* 로 눈대중 보정하던 것을 대체합니다.
+                        "group relative grid w-full cursor-pointer grid-cols-[28px_24px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-border bg-background p-2 transition-[border-color,background-color,transform] duration-150 ease-out hover:border-foreground/30 hover:bg-secondary/60 active:scale-[0.995] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                         selectedId === item.id && "border-primary bg-secondary",
                         draggingId === item.id && "border-primary bg-primary/10",
+                        getDropIndicatorClass(itemDropTarget, item.id),
                         item.error?.code === "unsupported_file_type" && "border-destructive bg-destructive/5",
                       )}
                     >
                       <input
                         aria-label={`Select ${item.name}`}
                         checked={isChecked}
-                        className="mt-3 size-4 cursor-pointer rounded-sm border border-input accent-primary"
+                        className="size-4 cursor-pointer justify-self-center rounded-sm border border-input accent-primary"
                         type="checkbox"
                         onChange={() => onToggleChecked(item.id)}
                         onClick={(event) => event.stopPropagation()}
@@ -367,7 +411,7 @@ export function BatchFileList({
                       />
                       <button
                         aria-label={`Reorder ${item.name}`}
-                        className="mt-2 flex size-6 touch-none cursor-grab items-center justify-center rounded-sm text-muted-foreground hover:bg-secondary hover:text-primary active:cursor-grabbing"
+                        className="flex size-6 touch-none cursor-grab items-center justify-center rounded-sm text-muted-foreground hover:bg-secondary hover:text-primary active:cursor-grabbing"
                         type="button"
                         onPointerDown={(event) => {
                           event.preventDefault();
@@ -382,10 +426,10 @@ export function BatchFileList({
                         }}
                         onPointerUp={(event) => {
                           event.stopPropagation();
-                          setDraggingId(undefined);
+                          commitItemDrag(item.id);
                         }}
-                        onPointerCancel={() => setDraggingId(undefined)}
-                        onLostPointerCapture={() => setDraggingId(undefined)}
+                        onPointerCancel={cancelItemDrag}
+                        onLostPointerCapture={cancelItemDrag}
                       >
                         <GripVertical aria-hidden="true" className="size-4" />
                       </button>
@@ -457,8 +501,13 @@ export function BatchFileList({
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
+                        {/*
+                          * 호버 색은 버튼 기본 transition(color 150ms)을 타고 서서히 물듭니다.
+                          * 비활성 다운로드는 disabled:pointer-events-none 때문에 호버 자체가 안 걸립니다.
+                          */}
                         <Button
                           aria-label={`Download ${item.name}`}
+                          className="hover:text-link"
                           disabled={!canDownload}
                           size="icon"
                           variant="ghost"
@@ -472,6 +521,7 @@ export function BatchFileList({
                         </Button>
                         <Button
                           aria-label={`Remove ${item.name}`}
+                          className="hover:text-destructive"
                           size="icon"
                           variant="ghost"
                           onClick={(event) => {
@@ -518,14 +568,17 @@ function GroupDragHandle({
   prefix,
   onDragStart,
   onDragMove,
-  onDragEnd,
+  onDrop,
+  onDragCancel,
 }: {
   groupKey: string;
   label: string;
   prefix: "folder" | "group";
   onDragStart: (groupKey: string) => void;
   onDragMove: (event: PointerEvent<HTMLElement>, groupKey: string) => void;
-  onDragEnd: () => void;
+  /** 손을 뗐을 때. 여기서만 순서를 확정합니다. */
+  onDrop: (groupKey: string) => void;
+  onDragCancel: () => void;
 }) {
   return (
     <button
@@ -541,14 +594,54 @@ function GroupDragHandle({
       onPointerMove={(event) => onDragMove(event, groupKey)}
       onPointerUp={(event) => {
         event.stopPropagation();
-        onDragEnd();
+        onDrop(groupKey);
       }}
-      onPointerCancel={onDragEnd}
-      onLostPointerCapture={onDragEnd}
+      onPointerCancel={onDragCancel}
+      onLostPointerCapture={onDragCancel}
     >
       <GripVertical aria-hidden="true" className="size-4" />
     </button>
   );
+}
+
+/** 놓을 자리. 대상 행/그룹의 위(before)냐 아래(after)냐까지 담습니다. */
+type DropTarget = { key: string; placement: ReorderPlacement };
+
+/** 목록 가장자리에서 이만큼 안쪽에 들어오면 스크롤을 시작합니다. */
+const AUTO_SCROLL_EDGE = 48;
+const AUTO_SCROLL_STEP = 14;
+
+/**
+ * 화면 밖 위치로도 옮길 수 있게, 목록 위아래 끝에서 끌면 스크롤합니다.
+ * ponytail: 포인터가 움직일 때만 한 칸씩 밉니다. 끝에 가만히 대고 있어도 계속 흐르게
+ * 하려면 타이머가 필요한데, 그만한 값어치가 없어 살짝 움직이는 것으로 대신합니다.
+ */
+function autoScrollListEdge(list: HTMLDivElement | null, pointerY: number) {
+  if (!list) {
+    return;
+  }
+
+  const rect = list.getBoundingClientRect();
+
+  if (pointerY < rect.top + AUTO_SCROLL_EDGE) {
+    list.scrollTop -= AUTO_SCROLL_STEP;
+    return;
+  }
+
+  if (pointerY > rect.bottom - AUTO_SCROLL_EDGE) {
+    list.scrollTop += AUTO_SCROLL_STEP;
+  }
+}
+
+/** 놓을 자리를 알려주는 선. 대상 행 위/아래에 안쪽 그림자로 그려 높이가 흔들리지 않습니다. */
+function getDropIndicatorClass(target: DropTarget | undefined, key: string) {
+  if (target?.key !== key) {
+    return undefined;
+  }
+
+  return target.placement === "before"
+    ? "shadow-[inset_0_3px_0_0_hsl(var(--primary))]"
+    : "shadow-[inset_0_-3px_0_0_hsl(var(--primary))]";
 }
 
 function getPointerDragTarget(event: PointerEvent<HTMLElement>, datasetKey: "mediaRowId" | "mediaGroupKey") {

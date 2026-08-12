@@ -1,4 +1,4 @@
-# Media Convert Desk
+# Media Convert Board
 
 이미지와 짧은 영상을 **브라우저 안에서** 압축·변환하는 Next.js 대시보드입니다.
 
@@ -27,17 +27,19 @@ npm run dev
 
 ## 2. 사용 흐름
 
-1. **`Files`** 또는 **`Folder`** 로 이미지·영상을 추가합니다.
+1. **`Files`** 또는 **`Folder`** 로 이미지·영상을 추가합니다. 드롭존에 파일·폴더를 끌어다 놓아도 됩니다.
 2. Source queue에서 변환할 항목을 **체크**합니다.
-3. 우측 **톱니바퀴**로 Settings를 열어 포맷·압축·리사이즈를 정합니다.
+3. 우측 **`Settings`** 버튼으로 설정을 열어 포맷·압축·리사이즈를 정합니다.
 4. 하단 **`변환 (N)`** 으로 체크된 미변환 항목을 변환합니다.
 5. **`다운로드 (N)`** 으로 결과를 저장합니다. 1개면 단일 파일, 여러 개면 ZIP입니다.
 
 지원하지 않는 파일은 빨간 테두리로 표시되고 변환 대상에서 자동 제외됩니다. 상단 경고의 파일명을 클릭하면 해당 항목으로 스크롤됩니다.
 
+`Folder` 버튼은 브라우저에 따라 두 갈래로 동작합니다. File System Access API를 지원하면(Chrome·Edge 등 Chromium 계열) 디렉터리 선택기를 써서 **업로드 확인창 없이** 폴더를 읽고, 지원하지 않으면(Firefox·Safari) 기존 `<input webkitdirectory>` 로 되돌아갑니다. 후자에서는 브라우저가 띄우는 업로드 확인창이 그대로 나타나며, 이는 브라우저 보안 UI라 페이지 쪽에서 끌 수 없습니다.
+
 ### 화면 구성
 
-![Media Convert Desk dashboard](public/readme/dashboard-overview.png)
+![Media Convert Board dashboard](public/readme/dashboard-overview.png)
 
 - **상단** — Total / Images / Videos / Selected / Converted / Input·Output Total Size, 우측 끝에 테마 토글
 - **좌측** — 업로드, Source queue (그룹·정렬·이름 변경·선택)

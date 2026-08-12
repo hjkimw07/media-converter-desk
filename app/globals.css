@@ -50,6 +50,8 @@
     --accent-pink: 330 100% 68%;
 
     --mesh-alpha: 0.24;
+    /* 다크 배경(#000) 위에서도 뒤가 확실히 물러나야 해 라이트보다 더 짙게 깝니다. */
+    --scrim-alpha: 0.7;
     color-scheme: dark;
   }
 
@@ -89,6 +91,7 @@
     --accent-pink: 330 100% 45%;
 
     --mesh-alpha: 0.16;
+    --scrim-alpha: 0.45;
     color-scheme: light;
   }
 
@@ -100,6 +103,12 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    /*
+     * 한국어는 어절 단위로 끊어야 읽힙니다. 기본값은 음절 중간에서도 줄을 바꿔
+     * "비교합니 / 다."처럼 잘립니다. 상속되므로 여기 한 번이면 전체에 적용됩니다.
+     * 끊어야 하는 긴 문자열(에러 상세 등)은 break-all 유틸리티로 개별 해제합니다.
+     */
+    word-break: keep-all;
     font-family: var(--font-geist-sans), Arial, ui-sans-serif, system-ui, sans-serif;
     font-feature-settings:
       "calt" 1,
@@ -163,6 +172,14 @@
     font-weight: 500;
     line-height: 16px;
     text-transform: uppercase;
+  }
+
+  /*
+   * 오버레이 뒤를 가리는 딤. 잉크 토큰은 다크에서 흰색이라 딤이 아니라
+   * 밝은 막이 돼버리므로, 테마와 무관하게 검정으로 고정하고 농도만 바꿉니다.
+   */
+  .scrim {
+    background-color: hsl(0 0% 0% / var(--scrim-alpha));
   }
 
   .hairline-dashed {

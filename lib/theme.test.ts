@@ -36,7 +36,7 @@ describe("writeStoredTheme", () => {
 
     writeStoredTheme({ setItem }, "light");
 
-    expect(setItem).toHaveBeenCalledWith("media-convert-desk:theme", "light");
+    expect(setItem).toHaveBeenCalledWith("media-convert-board:theme", "light");
   });
 
   it("저장이 실패해도 예외를 밖으로 던지지 않아야 한다", () => {

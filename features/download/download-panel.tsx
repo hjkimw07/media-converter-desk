@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { formatBytes } from "@/lib/media/format";
 import { cn } from "@/lib/utils";
 
+/*
+ * 데스크탑에서는 xl:min-h-[72px]가 만든 여유 공간 위쪽에 내용이 붙어 있었습니다.
+ * 세로 방향 flex로 감싸 남는 높이를 위아래로 나눠 갖게 합니다.
+ */
+const PANEL_CLASS =
+  "shrink-0 rounded-md border border-border bg-card px-3 py-2 xl:flex xl:min-h-[72px] xl:flex-col xl:justify-center";
+
 type DownloadPanelProps = {
   className?: string;
   selectedCount: number;
@@ -40,7 +47,7 @@ export function DownloadPanel({
   return (
     <section
       data-testid="download-panel"
-      className={cn("shrink-0 rounded-md border border-border bg-card px-3 py-2 xl:min-h-[72px]", className)}
+      className={cn(PANEL_CLASS, className)}
     >
       <div
         data-testid="download-panel-layout"
