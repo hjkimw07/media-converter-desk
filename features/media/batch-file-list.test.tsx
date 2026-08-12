@@ -395,6 +395,86 @@ describe("BatchFileList", () => {
     expect(onReorder).not.toHaveBeenCalled();
   });
 
+  it("전체 접기·펼치기로 모든 그룹을 한 번에 여닫아야 한다", () => {
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[
+          createItem("a", "photo.png", 0, false, "Trip/photo.png"),
+          createItem("b", "clip.png", 0, false, "Work/clip.png"),
+        ]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    expect(screen.getByTestId("media-row-a")).toBeInTheDocument();
+    expect(screen.getByTestId("media-row-b")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all groups" }));
+
+    expect(screen.queryByTestId("media-row-a")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("media-row-b")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
+
+    expect(screen.getByTestId("media-row-a")).toBeInTheDocument();
+    expect(screen.getByTestId("media-row-b")).toBeInTheDocument();
+  });
+
+  it("그룹 하나를 따로 접어도 전체 접기 버튼은 남은 그룹을 마저 접어야 한다", () => {
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[
+          createItem("a", "photo.png", 0, false, "Trip/photo.png"),
+          createItem("b", "clip.png", 0, false, "Work/clip.png"),
+        ]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse folder Trip" }));
+    expect(screen.queryByTestId("media-row-a")).not.toBeInTheDocument();
+    expect(screen.getByTestId("media-row-b")).toBeInTheDocument();
+
+    // 일부만 접힌 상태에서는 여전히 "전체 접기"여야 한다.
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all groups" }));
+    expect(screen.queryByTestId("media-row-b")).not.toBeInTheDocument();
+  });
+
+  it("그룹 머리글이 없으면 전체 접기 버튼도 없어야 한다", () => {
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[createItem("a", "sample.png")]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /all groups/ })).not.toBeInTheDocument();
+  });
+
   it("does not start drag reorder from the regular row surface", () => {
     const onReorder = vi.fn();
 

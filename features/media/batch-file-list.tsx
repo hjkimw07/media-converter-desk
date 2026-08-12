@@ -1,7 +1,20 @@
 "use client";
 
 import { useRef, useState, type PointerEvent } from "react";
-import { Check, CheckCheck, ChevronDown, ChevronRight, Download, Folder, GripVertical, Minus, SquareMinus, Trash2 } from "lucide-react";
+import {
+  Check,
+  CheckCheck,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Download,
+  Folder,
+  GripVertical,
+  Minus,
+  SquareMinus,
+  Trash2,
+} from "lucide-react";
 import type { UploadedMedia } from "@/types/media";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,6 +82,11 @@ export function BatchFileList({
   const allChecked = items.length > 0 && selectedVisibleCount === items.length;
   const groups = groupMediaByFolder(items);
   const shouldShowGroupHeaders = groups.length > 1 || groups.some((group) => group.isFolder);
+  const areAllGroupsCollapsed = groups.length > 0 && groups.every((group) => collapsedGroupKeys.has(group.key));
+  const toggleAllGroups = () => {
+    // 접을 때 키를 새로 만들어, 사라진 그룹의 잔여 키가 쌓이지 않게 합니다.
+    setCollapsedGroupKeys(areAllGroupsCollapsed ? new Set() : new Set(groups.map((group) => group.key)));
+  };
   const startRename = (item: UploadedMedia) => {
     setEditingId(item.id);
     setEditingName(item.name);
@@ -157,9 +175,25 @@ export function BatchFileList({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-border px-3 py-2">
         <p className="truncate text-xs text-muted-foreground">{selectedVisibleCount}개 선택</p>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex flex-wrap items-center justify-end gap-1">
+          {shouldShowGroupHeaders ? (
+            <Button
+              aria-label={areAllGroupsCollapsed ? "Expand all groups" : "Collapse all groups"}
+              className="h-8 px-2 text-xs"
+              size="sm"
+              variant="ghost"
+              onClick={toggleAllGroups}
+            >
+              {areAllGroupsCollapsed ? (
+                <ChevronsUpDown aria-hidden="true" data-icon="inline-start" className="text-accent-cyan" />
+              ) : (
+                <ChevronsDownUp aria-hidden="true" data-icon="inline-start" className="text-accent-cyan" />
+              )}
+              {areAllGroupsCollapsed ? "전체 펼치기" : "전체 접기"}
+            </Button>
+          ) : null}
           <Button className="h-8 px-2 text-xs" size="sm" variant="ghost" onClick={() => onToggleAll(!allChecked)}>
             {allChecked ? (
               <SquareMinus aria-hidden="true" data-icon="inline-start" className="text-warning" />
