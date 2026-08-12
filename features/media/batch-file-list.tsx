@@ -9,6 +9,7 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   Download,
+  Files,
   Folder,
   GripVertical,
   Minus,
@@ -332,14 +333,23 @@ export function BatchFileList({
                       </Button>
                     </>
                   )}
-                  {/* 폴더 아이콘은 이름 바로 왼쪽에 붙여 무엇의 이름인지 한눈에 보이게 합니다. */}
+                  {/*
+                    * 그룹 아이콘은 이름 바로 왼쪽에 붙여 무엇의 이름인지 한눈에 보이게 합니다.
+                    * 업로드한 폴더는 폴더로, 폴더에 속하지 않은 파일 묶음은 낱장 파일로 구분합니다.
+                    */}
                   {group.isFolder ? (
                     <Folder
                       aria-hidden="true"
                       className="size-4 shrink-0 text-primary"
                       data-testid={`folder-group-icon-${group.key}`}
                     />
-                  ) : null}
+                  ) : (
+                    <Files
+                      aria-hidden="true"
+                      className="size-4 shrink-0 text-muted-foreground"
+                      data-testid={`loose-group-icon-${group.key}`}
+                    />
+                  )}
                   {group.isFolder && editingFolderKey === group.key ? (
                     <input
                       aria-label={`Rename folder ${group.label}`}

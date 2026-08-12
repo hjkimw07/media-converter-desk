@@ -667,6 +667,10 @@ describe("BatchFileList", () => {
 
     expect(screen.getByTestId("folder-group-icon-Trip")).toBeInTheDocument();
     expect(screen.queryByTestId("folder-group-icon-__loose_media__")).not.toBeInTheDocument();
+
+    // 개별 파일 묶음은 폴더가 아니라 낱장 파일 아이콘으로 구분합니다.
+    expect(screen.getByTestId("loose-group-icon-__loose_media__")).toBeInTheDocument();
+    expect(screen.queryByTestId("loose-group-icon-Trip")).not.toBeInTheDocument();
   });
 
   it("collapses and expands folder-uploaded groups without deleting items", () => {
