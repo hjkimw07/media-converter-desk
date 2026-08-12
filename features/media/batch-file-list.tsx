@@ -411,7 +411,7 @@ export function BatchFileList({
                       />
                       <button
                         aria-label={`Reorder ${item.name}`}
-                        className="flex size-6 touch-none cursor-grab items-center justify-center rounded-sm text-muted-foreground hover:bg-secondary hover:text-primary active:cursor-grabbing"
+                        className={cn(DRAG_HANDLE_HIT_AREA, "size-6 hover:bg-secondary")}
                         type="button"
                         onPointerDown={(event) => {
                           event.preventDefault();
@@ -583,7 +583,7 @@ function GroupDragHandle({
   return (
     <button
       aria-label={`Reorder ${prefix} ${label}`}
-      className="flex size-7 shrink-0 touch-none cursor-grab items-center justify-center rounded-sm text-muted-foreground hover:bg-background hover:text-primary active:cursor-grabbing"
+      className={cn(DRAG_HANDLE_HIT_AREA, "size-7 hover:bg-background")}
       type="button"
       onPointerDown={(event) => {
         event.preventDefault();
@@ -603,6 +603,14 @@ function GroupDragHandle({
     </button>
   );
 }
+
+/**
+ * 드래그 핸들 공통 스타일.
+ * 손가락으로 잡기엔 24~28px가 작아 ::before로 사방 8px을 더해 잡는 영역만 40px대로 넓힙니다.
+ * 눈에 보이는 크기와 그리드 칸 폭은 그대로라 배치가 흔들리지 않습니다.
+ */
+const DRAG_HANDLE_HIT_AREA =
+  "relative flex shrink-0 touch-none cursor-grab items-center justify-center rounded-sm text-muted-foreground hover:text-primary active:cursor-grabbing before:absolute before:-inset-2 before:content-['']";
 
 /** 놓을 자리. 대상 행/그룹의 위(before)냐 아래(after)냐까지 담습니다. */
 type DropTarget = { key: string; placement: ReorderPlacement };

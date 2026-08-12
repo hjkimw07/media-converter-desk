@@ -60,6 +60,30 @@ describe("BatchFileList", () => {
     expect(screen.getByTestId("media-row-a")).toHaveClass("items-center");
   });
 
+  it("드래그 핸들은 보이는 크기보다 넓게 잡히고 터치 스크롤을 막아야 한다", () => {
+    render(
+      <BatchFileList
+        checkedIds={new Set()}
+        items={[createItem("a", "sample.png")]}
+        onDownload={vi.fn()}
+        onRemove={vi.fn()}
+        onRemoveFolder={vi.fn()}
+        onReorder={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleAll={vi.fn()}
+        onToggleChecked={vi.fn()}
+        selectedId="a"
+      />,
+    );
+
+    const handle = screen.getByLabelText("Reorder sample.png");
+
+    // 보이는 크기는 그대로 두고 ::before로만 잡는 영역을 넓힙니다.
+    expect(handle).toHaveClass("size-6", "relative", "before:-inset-2");
+    // touch-action이 풀리면 브라우저가 스크롤로 판정해 드래그가 취소됩니다.
+    expect(handle).toHaveClass("touch-none");
+  });
+
   it("selects a media row for preview without starting a reorder", () => {
     const onSelect = vi.fn();
     const onReorder = vi.fn();
