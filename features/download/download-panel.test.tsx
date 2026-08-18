@@ -149,9 +149,10 @@ describe("DownloadPanel", () => {
     );
 
     expect(screen.getByTestId("download-panel")).toHaveClass("xl:min-h-[72px]");
-    expect(screen.getByTestId("download-panel-layout")).toHaveClass(
-      "xl:grid-cols-[minmax(220px,1fr)_minmax(220px,280px)_minmax(320px,420px)]",
-    );
+    // 데스크탑에서는 폭을 고정하지 않아야 상태 카운트 글자가 잘리지 않는다.
+    expect(screen.getByTestId("download-panel-layout")).toHaveClass("xl:flex", "xl:flex-wrap");
+    expect(screen.getByTestId("download-panel-layout").className).not.toContain("xl:grid-cols-");
+    expect(screen.getByTestId("download-status-row")).toHaveClass("xl:flex", "xl:shrink-0");
     expect(screen.getByTestId("download-selection-summary")).toHaveClass("xl:min-h-10");
     expect(screen.getByTestId("download-status-row")).toHaveClass("min-w-0");
     expect(screen.getByTestId("download-action-row")).toHaveClass("min-w-0");
