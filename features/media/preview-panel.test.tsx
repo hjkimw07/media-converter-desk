@@ -336,6 +336,103 @@ function createConvertedImage() {
   } as UploadedMedia;
 }
 
+describe("PreviewPanel - 키보드 배율 단축키", () => {
+  it("-, + 키를 누르면 배율이 10%p씩 움직여야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    const zoomInput = screen.getByLabelText("Zoom percent");
+
+    fireEvent.keyDown(window, { key: "+" });
+    expect(zoomInput).toHaveValue("110");
+
+    fireEvent.keyDown(window, { key: "-" });
+    fireEvent.keyDown(window, { key: "-" });
+    expect(zoomInput).toHaveValue("90");
+  });
+
+  it("한글 입력 상태처럼 key 값이 달라도 키 위치로 동작해야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    const zoomInput = screen.getByLabelText("Zoom percent");
+
+    // 입력기가 켜져 있으면 key로 "+" 대신 "Process"가 오기도 합니다.
+    fireEvent.keyDown(window, { code: "Equal", key: "Process" });
+    expect(zoomInput).toHaveValue("110");
+
+    fireEvent.keyDown(window, { code: "Minus", key: "Process" });
+    expect(zoomInput).toHaveValue("100");
+
+    fireEvent.keyDown(window, { code: "NumpadAdd", key: "Process" });
+    expect(zoomInput).toHaveValue("110");
+  });
+
+  it("Shift와 함께 누르면 100%p씩 움직여야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    const zoomInput = screen.getByLabelText("Zoom percent");
+
+    fireEvent.keyDown(window, { code: "Equal", key: "+", shiftKey: true });
+    expect(zoomInput).toHaveValue("200");
+
+    fireEvent.keyDown(window, { code: "Minus", key: "_", shiftKey: true });
+    expect(zoomInput).toHaveValue("100");
+
+    // Shift 없이는 그대로 미세 조정이어야 한다.
+    fireEvent.keyDown(window, { code: "Equal", key: "=" });
+    expect(zoomInput).toHaveValue("110");
+  });
+
+  it("Shift 조정도 허용 범위를 넘지 않아야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    const zoomInput = screen.getByLabelText("Zoom percent");
+
+    fireEvent.keyDown(window, { code: "Minus", key: "_", shiftKey: true });
+
+    expect(zoomInput).toHaveValue("50");
+  });
+
+  it("단축키로 바뀐 배율이 원본과 결과 이미지에 모두 적용돼야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    fireEvent.keyDown(window, { code: "Equal", key: "+" });
+
+    const previews = screen.getAllByAltText("sample.png");
+
+    expect(previews).toHaveLength(2);
+    previews.forEach((preview) => expect(preview).toHaveStyle({ width: "110%", height: "110%" }));
+  });
+
+  it("배율 입력 칸에서 누른 -, + 는 배율을 바꾸지 않아야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    const zoomInput = screen.getByLabelText("Zoom percent");
+
+    fireEvent.keyDown(zoomInput, { code: "Equal", key: "+" });
+
+    expect(zoomInput).toHaveValue("100");
+  });
+
+  it("Ctrl·⌘ 조합은 브라우저 확대라 가로채지 않아야 한다", () => {
+    render(<PreviewPanel item={createConvertedImage()} />);
+
+    const zoomInput = screen.getByLabelText("Zoom percent");
+
+    fireEvent.keyDown(window, { code: "Equal", ctrlKey: true, key: "+" });
+    fireEvent.keyDown(window, { code: "Minus", key: "-", metaKey: true });
+
+    expect(zoomInput).toHaveValue("100");
+  });
+
+  it("미리보기가 비어 있으면 단축키가 동작하지 않아야 한다", () => {
+    render(<PreviewPanel />);
+
+    fireEvent.keyDown(window, { key: "+" });
+
+    expect(screen.queryByLabelText("Zoom percent")).not.toBeInTheDocument();
+  });
+});
+
 describe("PreviewPanel - 변환 경고", () => {
   it("결과에 경고가 있으면 화면에 표시해야 한다", () => {
     const item = createConvertedImage();
