@@ -6,6 +6,7 @@ import {
   Download,
   FileStack,
   HardDrive,
+  HelpCircle,
   ImageIcon,
   ListChecks,
   Settings,
@@ -24,6 +25,7 @@ import { ArchiveNamingPanel } from "@/features/media/archive-naming-panel";
 import { BatchFileList } from "@/features/media/batch-file-list";
 import { OutputNamingPanel } from "@/features/media/output-naming-panel";
 import { PreviewPanel } from "@/features/media/preview-panel";
+import { OnboardingGuide } from "@/features/onboarding/onboarding-guide";
 import { ThemeToggle } from "@/features/theme/theme-toggle";
 import { FileUploader } from "@/features/upload/file-uploader";
 import { VideoSettingsPanel } from "@/features/video/video-settings-panel";
@@ -43,6 +45,7 @@ import {
   writeStoredInspectorOpen,
   writeStoredLeftPanelWidth,
 } from "@/lib/media/panel-layout";
+import { isOnboardingDismissed } from "@/lib/onboarding";
 import { getBrowserVideoDecision } from "@/lib/video/capability";
 import { validateMediaFile } from "@/lib/validation/media-validation";
 import { useMediaStore } from "@/stores/media-store";
@@ -72,6 +75,23 @@ const METRIC_TONE_CLASS: Record<string, string> = {
   outputSize: "text-accent-pink",
 };
 
+/** 헤더에서 사용법 안내를 다시 여는 버튼. 모바일·데스크탑 헤더 양쪽에 같은 모양으로 놓입니다. */
+function GuideButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button
+      aria-label="사용법 보기"
+      className="size-9 shrink-0 p-0"
+      size="icon"
+      title="사용법 보기"
+      type="button"
+      variant="secondary"
+      onClick={onClick}
+    >
+      <HelpCircle aria-hidden="true" />
+    </Button>
+  );
+}
+
 type UploadErrorItem = {
   id: string;
   fileName: string;
@@ -85,6 +105,7 @@ export function MediaWorkspace() {
   const [isInspectorOpen, setInspectorOpen] = useState(false);
   const [isClearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [folderKeyPendingRemoval, setFolderKeyPendingRemoval] = useState<string>();
+  const [isGuideOpen, setGuideOpen] = useState(false);
   const items = useMediaStore((state) => state.items);
   const selectedId = useMediaStore((state) => state.selectedId);
   const imageOptions = useMediaStore((state) => state.imageOptions);
@@ -467,6 +488,14 @@ export function MediaWorkspace() {
     [leftPanelWidth],
   );
 
+  /*
+   * 최초 접속 안내는 마운트 뒤에 판별합니다. 서버에는 쿠키가 없어
+   * 렌더 중에 확인하면 하이드레이션이 어긋납니다.
+   */
+  useEffect(() => {
+    setGuideOpen(!isOnboardingDismissed());
+  }, []);
+
   return (
     <main className="min-h-[100svh] bg-background text-foreground xl:h-[100svh] xl:overflow-hidden">
       <div className="flex min-h-[100svh] flex-col xl:h-full xl:min-h-0">
@@ -482,7 +511,10 @@ export function MediaWorkspace() {
                   이미지와 짧은 영상을 로컬에서 변환하고, 서버/AI 처리는 후속 확장 지점으로 분리합니다.
                 </p>
               </div>
-              <ThemeToggle className="ml-auto xl:hidden" />
+              <div className="ml-auto flex shrink-0 items-center gap-2 xl:hidden">
+                <GuideButton onClick={() => setGuideOpen(true)} />
+                <ThemeToggle />
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
@@ -495,7 +527,10 @@ export function MediaWorkspace() {
                 <Metric icon={HardDrive} value={formatBytes(totalInputSize)} label="Input Total Size" tone="inputSize" />
                 <Metric icon={Download} value={formatBytes(totalOutputSize)} label="Output Total Size" tone="outputSize" />
               </div>
-              <ThemeToggle className="hidden xl:inline-flex" />
+              <div className="hidden shrink-0 items-center gap-2 xl:flex">
+                <GuideButton onClick={() => setGuideOpen(true)} />
+                <ThemeToggle />
+              </div>
             </div>
           </div>
         </header>
@@ -646,6 +681,8 @@ export function MediaWorkspace() {
         onCancel={() => setClearConfirmOpen(false)}
         onConfirm={clearSourceMedia}
       />
+
+      <OnboardingGuide open={isGuideOpen} onClose={() => setGuideOpen(false)} />
 
       <ConfirmDialog
         confirmLabel="그룹 삭제"

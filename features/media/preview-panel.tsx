@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
 import { ArrowRight, ChevronsLeft, ChevronsRight, ImageIcon, Layers, Maximize2, Minus, Plus, VideoIcon } from "lucide-react";
 import type { ApiError, MediaWarning, UploadedMedia } from "@/types/media";
 import { Badge } from "@/components/ui/badge";
@@ -78,6 +78,41 @@ export function PreviewPanel({ item, action }: PreviewPanelProps) {
       frame.scrollTop = anchorScrollToCenter(frame.scrollTop, frame.clientHeight, scale);
     });
   }, [zoom]);
+
+  /*
+   * -, + 키로도 배율을 조절합니다(Shift와 함께 누르면 100%p). 마우스를 컨트롤까지 옮기지 않고
+   * 확대/축소를 반복할 수 있어야 원본과 결과를 같은 지점에서 비교하기 쉽습니다.
+   * 입력 칸에서는 글자를 가로채면 안 되고, Ctrl/⌘ 조합은 브라우저 확대라 넘깁니다.
+   */
+  const hasPreview = Boolean(item);
+
+  useEffect(() => {
+    if (!hasPreview) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || isTextEntryTarget(event.target)) {
+        return;
+      }
+
+      const direction = ZOOM_SHORTCUT_DIRECTIONS[event.code] ?? ZOOM_SHORTCUT_DIRECTIONS[event.key];
+
+      if (!direction) {
+        return;
+      }
+
+      event.preventDefault();
+      // Shift를 함께 누르면 큰 조정 버튼과 같은 100%p 걸음으로 움직입니다.
+      const step = event.shiftKey ? largeStepZoom : stepZoom;
+
+      setZoom((current) => step(current, direction));
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [hasPreview]);
 
   if (!item) {
     return (
@@ -182,6 +217,32 @@ export function PreviewPanel({ item, action }: PreviewPanelProps) {
       </div>
     </section>
   );
+}
+
+/**
+ * -, + 키를 배율 방향으로 바꿉니다.
+ * 키 위치(`code`)를 먼저 보는 이유는 `+`가 Shift 조합이라 입력기(한글)나 자판 배열에 따라
+ * `key`로 "+"가 오지 않는 경우가 있기 때문입니다. `code`는 배열·입력기와 무관합니다.
+ * = 와 + 는 같은 키라 방향은 같고, Shift 여부로 걸음 폭(10%p / 100%p)만 갈립니다.
+ * `code`가 비는 환경(가상 키보드 등)을 위해 `key` 값도 함께 담아둡니다.
+ */
+const ZOOM_SHORTCUT_DIRECTIONS: Record<string, 1 | -1 | undefined> = {
+  Equal: 1,
+  NumpadAdd: 1,
+  "+": 1,
+  "=": 1,
+  Minus: -1,
+  NumpadSubtract: -1,
+  "-": -1,
+};
+
+/** 입력 중인 곳에서는 단축키가 글자를 가로채면 안 됩니다. */
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
 /** 변환 실패 사유를 보여줍니다. 원인 파악에 필요한 기술 상세는 접어서 함께 제공합니다. */

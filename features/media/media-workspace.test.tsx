@@ -6,6 +6,7 @@ import type { UploadedMedia } from "@/types/media";
 import { processImageInBrowser } from "@/lib/image/process-image";
 import { getFileRelativePath } from "@/lib/media/archive";
 import { saveAs } from "file-saver";
+import { buildOnboardingCookie } from "@/lib/onboarding";
 
 vi.mock("file-saver", () => ({
   saveAs: vi.fn(),
@@ -478,5 +479,42 @@ describe("MediaWorkspace - 전체 삭제 확인", () => {
 
     expect(useMediaStore.getState().items).toHaveLength(1);
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+});
+
+describe("MediaWorkspace - 최초 접속 안내", () => {
+  beforeEach(() => {
+    document.cookie = buildOnboardingCookie(0);
+    useMediaStore.setState({ items: [], selectedId: undefined });
+  });
+
+  it("숨김 쿠키가 없으면 최초 접속 안내가 떠야 한다", async () => {
+    render(<MediaWorkspace />);
+
+    expect(await screen.findByTestId("onboarding-guide")).toBeInTheDocument();
+  });
+
+  it("7일간 보지 않기를 선택하면 다음 방문에는 뜨지 않아야 한다", async () => {
+    const first = render(<MediaWorkspace />);
+
+    fireEvent.click(await screen.findByLabelText("7일간 보지 않기"));
+    fireEvent.click(screen.getByRole("button", { name: "시작하기" }));
+    first.unmount();
+
+    render(<MediaWorkspace />);
+
+    await waitFor(() => expect(screen.queryByTestId("onboarding-guide")).not.toBeInTheDocument());
+  });
+
+  it("헤더의 사용법 버튼으로 안내를 다시 열 수 있어야 한다", async () => {
+    document.cookie = buildOnboardingCookie();
+
+    render(<MediaWorkspace />);
+
+    await waitFor(() => expect(screen.queryByTestId("onboarding-guide")).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getAllByLabelText("사용법 보기")[0]);
+
+    expect(screen.getByTestId("onboarding-guide")).toBeInTheDocument();
   });
 });
